@@ -42,7 +42,7 @@ void SlideView::changeSong(int song) {
 }
 
 void SlideView::slideListUpdate(QStringList tagList, QStringList slideList) {
-	m_currentSlide = -1;
+	m_currentSlide = 0;
 	m_slideTable->setRowCount(slideList.size());
 	for (int i = 0; i < slideList.size(); ++i) {
 		auto txt = slideList[i];
@@ -54,9 +54,15 @@ void SlideView::slideListUpdate(QStringList tagList, QStringList slideList) {
 }
 
 void SlideView::songListUpdate(QStringList songList) {
+	// Is this replacing an existing song list or is it the initial song list?
+	// We want to reset the song to 0 upon replacement,
+	// but leave it alone upon initialization.
+	auto isReplacement = m_songSelector->count() > 0;
 	disconnect(m_songSelector, SIGNAL(currentIndexChanged(int)), this, SLOT(changeSong(int)));
 	m_songSelector->clear();
 	m_songSelector->addItems(songList);
-	changeSong(0);
+	if (isReplacement) {
+		changeSong(0);
+	}
 	connect(m_songSelector, SIGNAL(currentIndexChanged(int)), this, SLOT(changeSong(int)));
 }
