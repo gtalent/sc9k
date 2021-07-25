@@ -19,6 +19,9 @@ SlideView::SlideView(QWidget *parent): QWidget(parent) {
 	connect(header, &QHeaderView::sectionResized, m_slideTable, &QTableWidget::resizeRowsToContents);
 	m_slideTable->resizeRowsToContents();
 	m_slideTable->verticalHeader()->setDefaultSectionSize(300);
+#ifndef _WIN32
+	m_slideTable->setAlternatingRowColors(true);
+#endif
 	lyt->addWidget(m_songSelector);
 	lyt->addWidget(m_slideTable);
 	connect(m_slideTable, &QTableWidget::currentCellChanged, this, &SlideView::slideChanged);
