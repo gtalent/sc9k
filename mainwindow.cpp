@@ -28,7 +28,6 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent) {
 	const auto btnNextSong = new QPushButton(tr("Next Song (Right))"), this);
 	const auto btnBlankSlides = new QPushButton(tr("Blank Slides (,)"), this);
 	const auto btnShowSlides = new QPushButton(tr("Show Slides (.)"), this);
-	rootLyt->addLayout(controlsLayout);
 	controlsLayout->addWidget(btnPrevSlide, 0, 0);
 	controlsLayout->addWidget(btnNextSlide, 0, 1);
 	controlsLayout->addWidget(btnPrevSong, 1, 0);
