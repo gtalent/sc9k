@@ -14,7 +14,6 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent) {
 	setWindowTitle(tr("Slide Controller 9000"));
 	const auto mainWidget = new QWidget(this);
 	const auto rootLyt = new QVBoxLayout;
-	//const auto viewsLayout = new QHBoxLayout;
 	const auto controlsLayout = new QGridLayout;
 	const auto slideView = new SlideView(this);
 	setCentralWidget(mainWidget);

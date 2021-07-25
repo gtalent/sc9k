@@ -117,13 +117,11 @@ void OpenLPClient::handleSongListResponse(QNetworkReply *reply) {
 	QStringList songList;
 	auto doc = QJsonDocument::fromJson(data);
 	auto items = doc.object()["results"].toObject()["items"].toArray();
-	m_songIdMap.clear();
 	m_songNameMap.clear();
 	for (const auto &item : items) {
 		auto song = item.toObject();
 		auto name = song["title"].toString();
 		auto id = song["id"].toString();
-		m_songIdMap[name] = id;
 		m_songNameMap[id] = name;
 		songList.push_back(name);
 	}

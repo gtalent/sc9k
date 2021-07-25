@@ -18,7 +18,6 @@ class OpenLPClient: public QObject {
 		QNetworkAccessManager *m_songListNam = new QNetworkAccessManager(this);
 		QNetworkAccessManager *m_slideListNam = new QNetworkAccessManager(this);
 		QTimer m_pollTimer;
-		QHash<QString, QString> m_songIdMap;
 		QHash<QString, QString> m_songNameMap;
 		int m_currentServiceId = -1;
 		QString m_currentSongId;
