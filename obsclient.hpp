@@ -25,7 +25,5 @@ class OBSClient : public QObject
    private:
 		void get(QString url);
 
-   signals:
-
 };
 

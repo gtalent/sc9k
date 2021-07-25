@@ -4,8 +4,8 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QVBoxLayout>
-#include <QWebEngineView>
 
+#include "slideview.hpp"
 #include "mainwindow.hpp"
 
 MainWindow::MainWindow(QWidget *parent): QMainWindow(parent) {
@@ -14,16 +14,13 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent) {
 	setWindowTitle(tr("Slide Controller 9000"));
 	const auto mainWidget = new QWidget(this);
 	const auto rootLyt = new QVBoxLayout;
-	const auto viewsLayout = new QHBoxLayout;
+	//const auto viewsLayout = new QHBoxLayout;
 	const auto controlsLayout = new QGridLayout;
-	const auto slideView = new QWebEngineView(mainWidget);
+	const auto slideView = new SlideView(this);
 	setCentralWidget(mainWidget);
 	mainWidget->setLayout(rootLyt);
-	viewsLayout->addWidget(slideView, 1);
-	viewsLayout->setSizeConstraint(QLayout::SetFixedSize);
-	rootLyt->addLayout(viewsLayout);
+	rootLyt->addWidget(slideView);
 	rootLyt->addLayout(controlsLayout);
-	slideView->setUrl(QUrl("http://127.0.0.1:4316/main"));
 	// setup slide controls
 	const auto btnPrevSong = new QPushButton(tr("Previous Song (Left)"), this);
 	const auto btnPrevSlide = new QPushButton(tr("Previous Slide (Up)"), this);
@@ -32,9 +29,9 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent) {
 	const auto btnBlankSlides = new QPushButton(tr("Blank Slides (,)"), this);
 	const auto btnShowSlides = new QPushButton(tr("Show Slides (.)"), this);
 	rootLyt->addLayout(controlsLayout);
-	controlsLayout->addWidget(btnPrevSong, 0, 0);
-	controlsLayout->addWidget(btnPrevSlide, 0, 1);
-	controlsLayout->addWidget(btnNextSlide, 1, 0);
+	controlsLayout->addWidget(btnPrevSlide, 0, 0);
+	controlsLayout->addWidget(btnNextSlide, 0, 1);
+	controlsLayout->addWidget(btnPrevSong, 1, 0);
 	controlsLayout->addWidget(btnNextSong, 1, 1);
 	controlsLayout->addWidget(btnBlankSlides, 2, 0);
 	controlsLayout->addWidget(btnShowSlides, 2, 1);
@@ -52,6 +49,11 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent) {
 	connect(btnBlankSlides, &QPushButton::clicked, &m_openlpClient, &OpenLPClient::blankScreen);
 	connect(btnBlankSlides, &QPushButton::clicked, &m_obsClient, &OBSClient::hideSlides);
 	connect(btnShowSlides, &QPushButton::clicked, &m_openlpClient, &OpenLPClient::showSlides);
+	connect(&m_openlpClient, &OpenLPClient::pollUpdate, slideView, &SlideView::pollUpdate);
+	connect(&m_openlpClient, &OpenLPClient::songListUpdate, slideView, &SlideView::songListUpdate);
+	connect(&m_openlpClient, &OpenLPClient::slideListUpdate, slideView, &SlideView::slideListUpdate);
+	connect(slideView, &SlideView::songChanged, &m_openlpClient, &OpenLPClient::changeSong);
+	connect(slideView, &SlideView::slideChanged, &m_openlpClient, &OpenLPClient::changeSlide);
 	// setup scene selector
 	const auto btnObsHideSlides = new QPushButton(tr("Hide Slides in OBS (;)"), mainWidget);
 	const auto btnObsShowSlides = new QPushButton(tr("Show Slides in OBS (')"), mainWidget);
