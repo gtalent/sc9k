@@ -5,6 +5,8 @@
 #include <QObject>
 #include <QTimer>
 
+#include "consts.hpp"
+
 class OpenLPClient: public QObject {
 	Q_OBJECT
    private:
@@ -12,7 +14,7 @@ class OpenLPClient: public QObject {
 			QString name;
 			QString id;
 		};
-	   static constexpr auto BaseUrl = "http://127.0.0.1:4316";
+	   const QString BaseUrl = QString("http://") + SlideHost + ":4316";
 		QNetworkAccessManager *m_nam = new QNetworkAccessManager(this);
 		QNetworkAccessManager *m_pollingNam = new QNetworkAccessManager(this);
 		QNetworkAccessManager *m_songListNam = new QNetworkAccessManager(this);
@@ -62,6 +64,8 @@ class OpenLPClient: public QObject {
 
    signals:
 		void pollUpdate(QString songId, int slideNum);
+
+		void pollFailed();
 
 		void songListUpdate(QStringList);
 

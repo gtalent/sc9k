@@ -2,13 +2,17 @@
 
 #include <QNetworkAccessManager>
 #include <QObject>
+#include <QTimer>
 
-class OBSClient : public QObject
-{
+#include "consts.hpp"
+
+class OBSClient: public QObject {
 	Q_OBJECT
    private:
-	   static constexpr auto BaseUrl = "http://127.0.0.1:9302";
+	   const QString BaseUrl = QString("http://") + SlideHost + ":9302";
 		QNetworkAccessManager *m_nam = new QNetworkAccessManager(this);
+		QNetworkAccessManager *m_pollingNam = new QNetworkAccessManager(this);
+		QTimer m_pollTimer;
 
    public:
 		explicit OBSClient(QObject *parent = nullptr);
@@ -24,6 +28,15 @@ class OBSClient : public QObject
 
    private:
 		void get(QString url);
+
+		void poll();
+
+		void handlePollResponse(QNetworkReply *reply);
+
+	signals:
+		void pollUpdate();
+
+		void pollFailed();
 
 };
 

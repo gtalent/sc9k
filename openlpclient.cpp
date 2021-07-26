@@ -1,5 +1,5 @@
-#include <QJsonDocument>
 #include <QJsonArray>
+#include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonValueRef>
 #include <QNetworkReply>
@@ -85,6 +85,8 @@ void OpenLPClient::handleGeneralResponse(QNetworkReply *reply) {
 void OpenLPClient::handlePollResponse(QNetworkReply *reply) {
 	if (reply->error()) {
 		qDebug() << reply->errorString();
+		emit pollFailed();
+		return;
 	}
 	auto data = reply->readAll();
 	if (data.isEmpty()) {

@@ -3,6 +3,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QStatusBar>
 #include <QVBoxLayout>
 
 #include "slideview.hpp"
@@ -63,7 +64,55 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent) {
 	connect(btnObsHideSlides, &QPushButton::clicked, &m_obsClient, &OBSClient::hideSlides);
 	connect(btnObsShowSlides, &QPushButton::clicked, &m_obsClient, &OBSClient::showSlides);
 	connect(btnObsShowSlides, &QPushButton::clicked, &m_openlpClient, &OpenLPClient::showSlides);
+	// setup status bar
+	auto statusBar = new QStatusBar(this);
+	setStatusBar(statusBar);
+	connect(&m_openlpClient, &OpenLPClient::pollUpdate, this, &MainWindow::openLpConnectionInit);
+	connect(&m_openlpClient, &OpenLPClient::pollUpdate, [this] { ++m_openLPUpdates; });
+	connect(&m_obsClient, &OBSClient::pollUpdate, this, &MainWindow::obsConnectionInit);
+	connect(&m_obsClient, &OBSClient::pollUpdate, [this] { ++m_obsUpdates; });
+	m_statusBarTimer.start(5000);
+	connect(&m_statusBarTimer, &QTimer::timeout, this, &MainWindow::refreshStatusBar);
+	refreshStatusBar();
 }
 
 MainWindow::~MainWindow() {
+}
+
+void MainWindow::openLpConnectionInit() {
+	disconnect(&m_openlpClient, &OpenLPClient::pollUpdate, this, &MainWindow::openLpConnectionInit);
+	++m_openLPUpdates;
+	refreshStatusBar();
+}
+
+void MainWindow::openLpConnectionLost() {
+	connect(&m_openlpClient, &OpenLPClient::pollUpdate, this, &MainWindow::openLpConnectionInit);
+}
+
+void MainWindow::obsConnectionInit() {
+	disconnect(&m_obsClient, &OBSClient::pollUpdate, this, &MainWindow::obsConnectionInit);
+	++m_openLPUpdates;
+	refreshStatusBar();
+}
+
+void MainWindow::obsConnectionLost() {
+	connect(&m_obsClient, &OBSClient::pollUpdate, this, &MainWindow::obsConnectionInit);
+}
+
+void MainWindow::refreshStatusBar() {
+	QString openLpStatus;
+	QString obsStatus;
+	if (m_openLPUpdates > 0) {
+		openLpStatus = tr("OpenLP: Connected");
+	} else {
+		openLpStatus = tr("OpenLP: Not Connected");
+	}
+	if (m_obsUpdates > 0) {
+		obsStatus = tr("OBS: Connected");
+	} else {
+		obsStatus = tr("OBS: Not Connected");
+	}
+	m_openLPUpdates = 0;
+	m_obsUpdates = 0;
+	statusBar()->showMessage(openLpStatus + " | " + obsStatus);
 }
