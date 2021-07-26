@@ -91,7 +91,7 @@ void MainWindow::openLpConnectionLost() {
 
 void MainWindow::obsConnectionInit() {
 	disconnect(&m_obsClient, &OBSClient::pollUpdate, this, &MainWindow::obsConnectionInit);
-	++m_openLPUpdates;
+	++m_obsUpdates;
 	refreshStatusBar();
 }
 
