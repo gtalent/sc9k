@@ -1,4 +1,4 @@
 
 #pragma once
 
-constexpr auto SlideHost = "turbo";
+constexpr auto SlideHost = "127.0.0.1";
