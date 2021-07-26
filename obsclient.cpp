@@ -37,7 +37,7 @@ void OBSClient::get(QString urlExt) {
 }
 
 void OBSClient::poll() {
-	QUrl url(QString(BaseUrl) + "/api/poll?_=1626628079579");
+	QUrl url(QString(BaseUrl) + "/ping");
 	QNetworkRequest rqst(url);
 	m_pollingNam->get(rqst);
 }
