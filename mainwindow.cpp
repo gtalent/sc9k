@@ -5,6 +5,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
+
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -58,6 +59,7 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent) {
 	connect(&m_openlpClient, &OpenLPClient::pollUpdate, slideView, &SlideView::pollUpdate);
 	connect(&m_openlpClient, &OpenLPClient::songListUpdate, slideView, &SlideView::songListUpdate);
 	connect(&m_openlpClient, &OpenLPClient::slideListUpdate, slideView, &SlideView::slideListUpdate);
+	connect(&m_openlpClient, &OpenLPClient::pollFailed, slideView, &SlideView::reset);
 	connect(slideView, &SlideView::songChanged, &m_openlpClient, &OpenLPClient::changeSong);
 	connect(slideView, &SlideView::slideChanged, &m_openlpClient, &OpenLPClient::changeSlide);
 	// setup scene selector
@@ -72,14 +74,9 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent) {
 	connect(btnObsShowSlides, &QPushButton::clicked, &m_obsClient, &OBSClient::showSlides);
 	connect(btnObsShowSlides, &QPushButton::clicked, &m_openlpClient, &OpenLPClient::showSlides);
 	// setup status bar
-	auto statusBar = new QStatusBar(this);
-	setStatusBar(statusBar);
+	setStatusBar(new QStatusBar(this));
 	connect(&m_openlpClient, &OpenLPClient::pollUpdate, this, &MainWindow::openLpConnectionInit);
-	connect(&m_openlpClient, &OpenLPClient::pollUpdate, [this] { ++m_openLPUpdates; });
 	connect(&m_obsClient, &OBSClient::pollUpdate, this, &MainWindow::obsConnectionInit);
-	connect(&m_obsClient, &OBSClient::pollUpdate, [this] { ++m_obsUpdates; });
-	m_statusBarTimer.start(5000);
-	connect(&m_statusBarTimer, &QTimer::timeout, this, &MainWindow::refreshStatusBar);
 	refreshStatusBar();
 }
 
@@ -88,38 +85,34 @@ MainWindow::~MainWindow() {
 
 void MainWindow::openLpConnectionInit() {
 	disconnect(&m_openlpClient, &OpenLPClient::pollUpdate, this, &MainWindow::openLpConnectionInit);
-	++m_openLPUpdates;
+	connect(&m_openlpClient, &OpenLPClient::pollFailed, this, &MainWindow::openLpConnectionLost);
+	m_openLpConnected = true;
 	refreshStatusBar();
 }
 
 void MainWindow::openLpConnectionLost() {
+	disconnect(&m_openlpClient, &OpenLPClient::pollFailed, this, &MainWindow::openLpConnectionLost);
 	connect(&m_openlpClient, &OpenLPClient::pollUpdate, this, &MainWindow::openLpConnectionInit);
+	m_openLpConnected = false;
+	refreshStatusBar();
 }
 
 void MainWindow::obsConnectionInit() {
 	disconnect(&m_obsClient, &OBSClient::pollUpdate, this, &MainWindow::obsConnectionInit);
-	++m_obsUpdates;
+	connect(&m_obsClient, &OBSClient::pollFailed, this, &MainWindow::obsConnectionLost);
+	m_obsConnected = true;
 	refreshStatusBar();
 }
 
 void MainWindow::obsConnectionLost() {
+	disconnect(&m_obsClient, &OBSClient::pollFailed, this, &MainWindow::obsConnectionLost);
 	connect(&m_obsClient, &OBSClient::pollUpdate, this, &MainWindow::obsConnectionInit);
+	m_obsConnected = false;
+	refreshStatusBar();
 }
 
 void MainWindow::refreshStatusBar() {
-	QString openLpStatus;
-	QString obsStatus;
-	if (m_openLPUpdates > 0) {
-		openLpStatus = tr("OpenLP: Connected");
-	} else {
-		openLpStatus = tr("OpenLP: Not Connected");
-	}
-	if (m_obsUpdates > 0) {
-		obsStatus = tr("OBS: Connected");
-	} else {
-		obsStatus = tr("OBS: Not Connected");
-	}
-	m_openLPUpdates = 0;
-	m_obsUpdates = 0;
+	const auto openLpStatus = m_openLpConnected ? tr("OpenLP: Connected") : tr("OpenLP: Not Connected");
+	const auto obsStatus = m_obsConnected ? tr("OBS: Connected") : tr("OBS: Not Connected");
 	statusBar()->showMessage(openLpStatus + " | " + obsStatus);
 }

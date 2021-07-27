@@ -27,6 +27,8 @@ class SlideView : public QWidget
 
 		void slideListUpdate(QStringList tagList, QStringList songList);
 
+		void reset();
+
    private slots:
 		void changeSong(int song);
 

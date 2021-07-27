@@ -5,6 +5,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
+
 #include <QComboBox>
 #include <QDebug>
 #include <QHeaderView>
@@ -23,8 +24,6 @@ SlideView::SlideView(QWidget *parent): QWidget(parent) {
 	m_slideTable->setSelectionBehavior(QTableWidget::SelectionBehavior::SelectRows);
 	m_slideTable->setSelectionMode(QTableWidget::SelectionMode::SingleSelection);
 	m_slideTable->setColumnCount(1);
-	connect(header, &QHeaderView::sectionResized, m_slideTable, &QTableWidget::resizeRowsToContents);
-	m_slideTable->resizeRowsToContents();
 	m_slideTable->verticalHeader()->setDefaultSectionSize(300);
 #ifndef _WIN32
 	m_slideTable->setAlternatingRowColors(true);
@@ -61,6 +60,14 @@ void SlideView::slideListUpdate(QStringList tagList, QStringList slideList) {
 		m_slideTable->setItem(i, 0, item);
 	}
 	m_slideTable->setVerticalHeaderLabels(tagList);
+	m_slideTable->resizeRowsToContents();
+}
+
+void SlideView::reset() {
+	m_songSelector->clear();
+	m_slideTable->setRowCount(0);
+	m_currentSong = "";
+	m_currentSlide = -1;
 }
 
 void SlideView::songListUpdate(QStringList songList) {

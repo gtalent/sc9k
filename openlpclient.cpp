@@ -5,6 +5,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
+
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -15,7 +16,7 @@
 
 OpenLPClient::OpenLPClient(QObject *parent): QObject(parent) {
 	poll();
-	m_pollTimer.start(500);
+	m_pollTimer.start(250);
 	connect(&m_pollTimer, &QTimer::timeout, this, &OpenLPClient::poll);
 	connect(m_nam, &QNetworkAccessManager::finished, this, &OpenLPClient::handleGeneralResponse);
 	connect(m_songListNam, &QNetworkAccessManager::finished, this, &OpenLPClient::handleSongListResponse);
@@ -93,6 +94,9 @@ void OpenLPClient::handlePollResponse(QNetworkReply *reply) {
 	if (reply->error()) {
 		qDebug() << reply->errorString();
 		emit pollFailed();
+		m_currentServiceId = -1;
+		m_currentSongId = "";
+		m_songNameMap.clear();
 		return;
 	}
 	auto data = reply->readAll();
