@@ -8,11 +8,9 @@
 
 #include <QFormLayout>
 #include <QHBoxLayout>
-#include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QStatusBar>
-#include <QVBoxLayout>
 
 #include "slideview.hpp"
 #include "mainwindow.hpp"
@@ -78,9 +76,6 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent) {
 	connect(&m_openlpClient, &OpenLPClient::pollUpdate, this, &MainWindow::openLpConnectionInit);
 	connect(&m_obsClient, &OBSClient::pollUpdate, this, &MainWindow::obsConnectionInit);
 	refreshStatusBar();
-}
-
-MainWindow::~MainWindow() {
 }
 
 void MainWindow::openLpConnectionInit() {

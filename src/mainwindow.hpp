@@ -25,8 +25,8 @@ class MainWindow: public QMainWindow {
 		bool m_obsConnected = false;
 
    public:
-		MainWindow(QWidget *parent = nullptr);
-		~MainWindow();
+		explicit MainWindow(QWidget *parent = nullptr);
+		~MainWindow() override = default;
 
    private slots:
 		void openLpConnectionInit();
