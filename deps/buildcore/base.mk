@@ -16,13 +16,19 @@ else
 	HOST_ENV=${OS}-$(shell uname -m)
 endif
 
+ifeq (${$(shell python -c 'import sys; print(sys.version_info[0])')},3)
+	PYTHON3=python
+else
+	PYTHON3=python3
+endif
+
 SCRIPTS=${BUILDCORE_PATH}/scripts
 SETUP_BUILD=python3 ${SCRIPTS}/setup-build.py
-PYBB=python3 ${SCRIPTS}/pybb.py
+PYBB=${PYTHON3} ${SCRIPTS}/pybb.py
 CMAKE_BUILD=${PYBB} cmake-build
 RM_RF=${PYBB} rm
-SETUP_BUILD=python3 ${SCRIPTS}/setup-build.py
-PYBB=python3 ${SCRIPTS}/pybb.py
+SETUP_BUILD=${PYTHON3} ${SCRIPTS}/setup-build.py
+PYBB=${PYTHON3} ${SCRIPTS}/pybb.py
 CMAKE_BUILD=${PYBB} cmake-build
 RM_RF=${PYBB} rm
 ifdef USE_VCPKG
