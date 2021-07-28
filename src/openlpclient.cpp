@@ -85,12 +85,14 @@ void OpenLPClient::poll() {
 }
 
 void OpenLPClient::handleGeneralResponse(QNetworkReply *reply) {
+	reply->deleteLater();
 	if (reply->error()) {
 		qDebug() << "OpenLPClient error response:" << reply->request().url() << ":" << reply->errorString();
 	}
 }
 
 void OpenLPClient::handlePollResponse(QNetworkReply *reply) {
+	reply->deleteLater();
 	if (reply->error()) {
 		qDebug() << "OpenLPClient error response:" << reply->errorString();
 		emit pollFailed();
@@ -120,6 +122,7 @@ void OpenLPClient::handlePollResponse(QNetworkReply *reply) {
 }
 
 void OpenLPClient::handleSongListResponse(QNetworkReply *reply) {
+	reply->deleteLater();
 	if (reply->error()) {
 		qDebug() << "OpenLPClient error response:" << reply->errorString();
 	}
@@ -142,6 +145,7 @@ void OpenLPClient::handleSongListResponse(QNetworkReply *reply) {
 }
 
 void OpenLPClient::handleSlideListResponse(QNetworkReply *reply) {
+	reply->deleteLater();
 	if (reply->error()) {
 		qDebug() << "OpenLPClient error response:" << reply->errorString();
 	}

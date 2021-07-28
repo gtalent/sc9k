@@ -40,7 +40,7 @@ void OBSClient::setSlidesVisible(int state) {
 void OBSClient::get(QString urlExt) {
 	QUrl url(QString(BaseUrl) + urlExt);
 	QNetworkRequest rqst(url);
-	m_nam->get(rqst);
+	m_nam->get(rqst)->deleteLater();
 }
 
 void OBSClient::poll() {
@@ -50,6 +50,7 @@ void OBSClient::poll() {
 }
 
 void OBSClient::handlePollResponse(QNetworkReply *reply) {
+	reply->deleteLater();
 	if (reply->error()) {
 		qDebug() << "OBSClient error response:" << reply->errorString();
 		emit pollFailed();
