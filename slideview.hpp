@@ -9,8 +9,7 @@
 
 #include <QWidget>
 
-class SlideView : public QWidget
-{
+class SlideView: public QWidget {
 	Q_OBJECT
    private:
 	   class QTableWidget *m_slideTable = nullptr;

@@ -86,13 +86,13 @@ void OpenLPClient::poll() {
 
 void OpenLPClient::handleGeneralResponse(QNetworkReply *reply) {
 	if (reply->error()) {
-		qDebug() << reply->request().url() << ":" << reply->errorString();
+		qDebug() << "OpenLPClient error response:" << reply->request().url() << ":" << reply->errorString();
 	}
 }
 
 void OpenLPClient::handlePollResponse(QNetworkReply *reply) {
 	if (reply->error()) {
-		qDebug() << reply->errorString();
+		qDebug() << "OpenLPClient error response:" << reply->errorString();
 		emit pollFailed();
 		m_currentServiceId = -1;
 		m_currentSongId = "";
@@ -121,7 +121,7 @@ void OpenLPClient::handlePollResponse(QNetworkReply *reply) {
 
 void OpenLPClient::handleSongListResponse(QNetworkReply *reply) {
 	if (reply->error()) {
-		qDebug() << reply->errorString();
+		qDebug() << "OpenLPClient error response:" << reply->errorString();
 	}
 	auto data = reply->readAll();
 	if (data.isEmpty()) {
@@ -143,7 +143,7 @@ void OpenLPClient::handleSongListResponse(QNetworkReply *reply) {
 
 void OpenLPClient::handleSlideListResponse(QNetworkReply *reply) {
 	if (reply->error()) {
-		qDebug() << reply->errorString();
+		qDebug() << "OpenLPClient error response:" << reply->errorString();
 	}
 	auto data = reply->readAll();
 	if (data.isEmpty()) {

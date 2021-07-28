@@ -51,7 +51,7 @@ void OBSClient::poll() {
 
 void OBSClient::handlePollResponse(QNetworkReply *reply) {
 	if (reply->error()) {
-		qDebug() << reply->errorString();
+		qDebug() << "OBSClient error response:" << reply->errorString();
 		emit pollFailed();
 		return;
 	}

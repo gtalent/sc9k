@@ -16,6 +16,7 @@ SOURCES += \
     slideview.cpp
 
 HEADERS += \
+    consts.hpp \
     mainwindow.hpp \
     obsclient.hpp \
     openlpclient.hpp \
