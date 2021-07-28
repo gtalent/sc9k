@@ -27,10 +27,6 @@ SETUP_BUILD=${PYTHON3} ${SCRIPTS}/setup-build.py
 PYBB=${PYTHON3} ${SCRIPTS}/pybb.py
 CMAKE_BUILD=${PYBB} cmake-build
 RM_RF=${PYBB} rm
-SETUP_BUILD=${PYTHON3} ${SCRIPTS}/setup-build.py
-PYBB=${PYTHON3} ${SCRIPTS}/pybb.py
-CMAKE_BUILD=${PYBB} cmake-build
-RM_RF=${PYBB} rm
 ifdef USE_VCPKG
 	ifndef VCPKG_DIR_BASE
 		VCPKG_DIR_BASE=.vcpkg
