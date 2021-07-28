@@ -1,2 +1,10 @@
-SlideController.pro.user
+.clangd
+.conanbuild
+.current_build
+CMakeLists.txt.user
+Session.vim
 build
+compile_commands.json
+dist
+graph_info.json
+tags
