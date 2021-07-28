@@ -7,7 +7,7 @@ find_package(QT NAMES Qt6 Qt5 COMPONENTS Network Widgets REQUIRED)
 find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Network Widgets REQUIRED)
 
 add_executable(
-	SlideController MACOSX_BUNDLE
+	SlideController MACOSX_BUNDLE WIN32
 		main.cpp
 		mainwindow.cpp
 		obsclient.cpp
