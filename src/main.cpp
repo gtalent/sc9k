@@ -12,7 +12,8 @@
 
 int main(int argc, char *argv[]) {
 	QApplication a(argc, argv);
+	QApplication::setApplicationName(QObject::tr("Slide Controller 9000"));
 	MainWindow w;
 	w.show();
-	return a.exec();
+	return QApplication::exec();
 }

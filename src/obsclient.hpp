@@ -16,16 +16,16 @@
 
 class OBSClient: public QObject {
 	Q_OBJECT
-   private:
-	   const QString BaseUrl = QString("http://") + SlideHost + ":9302";
+	private:
+		const QString BaseUrl = QString("http://") + SlideHost + ":9302";
 		QNetworkAccessManager *m_nam = new QNetworkAccessManager(this);
 		QNetworkAccessManager *m_pollingNam = new QNetworkAccessManager(this);
 		QTimer m_pollTimer;
 
-   public:
+	public:
 		explicit OBSClient(QObject *parent = nullptr);
 
-   public slots:
+	public slots:
 		void setScene(QString scene);
 
 		void showSlides();
@@ -34,7 +34,7 @@ class OBSClient: public QObject {
 
 		void setSlidesVisible(int state);
 
-   private:
+	private:
 		void get(QString url);
 
 		void poll();

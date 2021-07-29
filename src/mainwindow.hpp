@@ -18,17 +18,17 @@
 class MainWindow: public QMainWindow {
 	Q_OBJECT
 
-   private:
-	   OBSClient m_obsClient;
+	private:
+		OBSClient m_obsClient;
 		OpenLPClient m_openlpClient;
 		bool m_openLpConnected = false;
 		bool m_obsConnected = false;
 
-   public:
+	public:
 		explicit MainWindow(QWidget *parent = nullptr);
 		~MainWindow() override = default;
 
-   private slots:
+	private slots:
 		void openLpConnectionInit();
 
 		void openLpConnectionLost();

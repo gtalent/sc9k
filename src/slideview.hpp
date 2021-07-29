@@ -11,15 +11,15 @@
 
 class SlideView: public QWidget {
 	Q_OBJECT
-   private:
-	   class QTableWidget *m_slideTable = nullptr;
+	private:
+		class QTableWidget *m_slideTable = nullptr;
 		class QComboBox *m_songSelector = nullptr;
 		QString m_currentSong;
 		int m_currentSlide = -1;
-   public:
+	public:
 		explicit SlideView(QWidget *parent = nullptr);
 
-   public slots:
+	public slots:
 		void pollUpdate(QString songId, int slideNum);
 
 		void songListUpdate(QStringList songList);
@@ -28,10 +28,10 @@ class SlideView: public QWidget {
 
 		void reset();
 
-   private slots:
+	private slots:
 		void changeSong(int song);
 
-   signals:
+	signals:
 		void songChanged(int);
 
 		void slideChanged(int);

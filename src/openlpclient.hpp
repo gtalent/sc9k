@@ -18,12 +18,12 @@
 class OpenLPClient: public QObject {
 	Q_OBJECT
 
-   private:
-	   struct Song {
+	private:
+		struct Song {
 			QString name;
 			QString id;
 		};
-	   const QString BaseUrl = QString("http://") + SlideHost + ":4316";
+		const QString BaseUrl = QString("http://") + SlideHost + ":4316";
 		QNetworkAccessManager *m_nam = new QNetworkAccessManager(this);
 		QNetworkAccessManager *m_pollingNam = new QNetworkAccessManager(this);
 		QNetworkAccessManager *m_songListNam = new QNetworkAccessManager(this);
@@ -33,10 +33,10 @@ class OpenLPClient: public QObject {
 		int m_currentServiceId = -1;
 		QString m_currentSongId;
 
-   public:
+	public:
 		explicit OpenLPClient(QObject *parent = nullptr);
 
-   public slots:
+	public slots:
 		void nextSlide();
 
 		void prevSlide();
@@ -53,14 +53,14 @@ class OpenLPClient: public QObject {
 
 		void changeSlide(int slide);
 
-   private:
+	private:
 		void get(QString url);
 
 		void requestSongList();
 
 		void requestSlideList();
 
-   private slots:
+	private slots:
 		void poll();
 
 		void handleGeneralResponse(QNetworkReply *reply);
@@ -71,7 +71,7 @@ class OpenLPClient: public QObject {
 
 		void handleSlideListResponse(QNetworkReply *reply);
 
-   signals:
+	signals:
 		void pollUpdate(QString songId, int slideNum);
 
 		void pollFailed();
