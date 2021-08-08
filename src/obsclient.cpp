@@ -5,6 +5,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
+
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QUrl>
@@ -40,7 +41,8 @@ void OBSClient::setSlidesVisible(int state) {
 void OBSClient::get(QString urlExt) {
 	QUrl url(QString(BaseUrl) + urlExt);
 	QNetworkRequest rqst(url);
-	m_nam->get(rqst)->deleteLater();
+	auto reply = m_nam->get(rqst);
+	connect(reply, &QIODevice::readyRead, reply, &QObject::deleteLater);
 }
 
 void OBSClient::poll() {
