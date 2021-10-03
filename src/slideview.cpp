@@ -33,6 +33,15 @@ SlideView::SlideView(QWidget *parent): QWidget(parent) {
 	connect(m_slideTable, &QTableWidget::currentCellChanged, this, &SlideView::slideChanged);
 }
 
+QString SlideView::getNextSong() const {
+	const auto cnt = m_songSelector->count();
+	const auto idx = m_songSelector->currentIndex() + 1;
+	if (idx < cnt) {
+		return m_songSelector->itemText(idx);
+	}
+	return "";
+}
+
 void SlideView::pollUpdate(QString songName, int slide) {
 	if (songName != m_currentSong) {
 		m_currentSong = songName;

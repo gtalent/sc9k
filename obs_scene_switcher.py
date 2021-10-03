@@ -3,6 +3,7 @@ from urllib.parse import urlparse, parse_qs
 import threading
 import obspython as obs
 
+
 def set_current_scene(scene_name):
     scenes = obs.obs_frontend_get_scenes()
     for scene in scenes:
@@ -11,6 +12,7 @@ def set_current_scene(scene_name):
             obs.obs_frontend_set_current_scene(scene)
             return 0
     return 1
+
 
 class RqstHandler(BaseHTTPRequestHandler):
 
@@ -25,12 +27,15 @@ class RqstHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.end_headers()
 
+
     def log_message(self, format, *args):
         pass
+
 
 def run(name):
     httpd = HTTPServer(('127.0.0.1', 9302), RqstHandler)
     httpd.serve_forever()
+
 
 t = threading.Thread(target=run, args=(1,), daemon=True)
 t.start()

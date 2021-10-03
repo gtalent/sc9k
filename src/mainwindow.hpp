@@ -21,6 +21,7 @@ class MainWindow: public QMainWindow {
 	private:
 		OBSClient m_obsClient;
 		OpenLPClient m_openlpClient;
+		class SlideView *m_slideView = nullptr;
 		bool m_openLpConnected = false;
 		bool m_obsConnected = false;
 

@@ -19,6 +19,8 @@ class SlideView: public QWidget {
 	public:
 		explicit SlideView(QWidget *parent = nullptr);
 
+		QString getNextSong() const;
+
 	public slots:
 		void pollUpdate(QString songId, int slideNum);
 

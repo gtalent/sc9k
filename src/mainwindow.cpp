@@ -20,10 +20,10 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent) {
 	const auto mainWidget = new QWidget(this);
 	const auto rootLyt = new QVBoxLayout;
 	const auto controlsLayout = new QGridLayout;
-	const auto slideView = new SlideView(this);
+	m_slideView = new SlideView(this);
 	setCentralWidget(mainWidget);
 	mainWidget->setLayout(rootLyt);
-	rootLyt->addWidget(slideView);
+	rootLyt->addWidget(m_slideView);
 	rootLyt->addLayout(controlsLayout);
 	// setup slide controls
 	const auto btnPrevSong = new QPushButton(tr("Previous Song (Left)"), this);
@@ -52,12 +52,12 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent) {
 	connect(btnBlankSlides, &QPushButton::clicked, &m_openlpClient, &OpenLPClient::blankScreen);
 	connect(btnBlankSlides, &QPushButton::clicked, &m_obsClient, &OBSClient::hideSlides);
 	connect(btnShowSlides, &QPushButton::clicked, &m_openlpClient, &OpenLPClient::showSlides);
-	connect(&m_openlpClient, &OpenLPClient::pollUpdate, slideView, &SlideView::pollUpdate);
-	connect(&m_openlpClient, &OpenLPClient::songListUpdate, slideView, &SlideView::songListUpdate);
-	connect(&m_openlpClient, &OpenLPClient::slideListUpdate, slideView, &SlideView::slideListUpdate);
-	connect(&m_openlpClient, &OpenLPClient::pollFailed, slideView, &SlideView::reset);
-	connect(slideView, &SlideView::songChanged, &m_openlpClient, &OpenLPClient::changeSong);
-	connect(slideView, &SlideView::slideChanged, &m_openlpClient, &OpenLPClient::changeSlide);
+	connect(&m_openlpClient, &OpenLPClient::pollUpdate, m_slideView, &SlideView::pollUpdate);
+	connect(&m_openlpClient, &OpenLPClient::songListUpdate, m_slideView, &SlideView::songListUpdate);
+	connect(&m_openlpClient, &OpenLPClient::slideListUpdate, m_slideView, &SlideView::slideListUpdate);
+	connect(&m_openlpClient, &OpenLPClient::pollFailed, m_slideView, &SlideView::reset);
+	connect(m_slideView, &SlideView::songChanged, &m_openlpClient, &OpenLPClient::changeSong);
+	connect(m_slideView, &SlideView::slideChanged, &m_openlpClient, &OpenLPClient::changeSlide);
 	// setup scene selector
 	const auto btnObsHideSlides = new QPushButton(tr("Hide Slides in OBS (;)"), mainWidget);
 	const auto btnObsShowSlides = new QPushButton(tr("Show Slides in OBS (')"), mainWidget);
@@ -107,5 +107,7 @@ void MainWindow::obsConnectionLost() {
 void MainWindow::refreshStatusBar() {
 	const auto openLpStatus = m_openLpConnected ? tr("OpenLP: Connected") : tr("OpenLP: Not Connected");
 	const auto obsStatus = m_obsConnected ? tr("OBS: Connected") : tr("OBS: Not Connected");
-	statusBar()->showMessage(openLpStatus + " | " + obsStatus);
+	const auto nextSong = m_slideView->getNextSong();
+	const auto nextSongTxt = m_openLpConnected ? " | Next Song: " + nextSong : "";
+	statusBar()->showMessage(openLpStatus + " | " + obsStatus + nextSongTxt);
 }
