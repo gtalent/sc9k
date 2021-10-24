@@ -80,5 +80,6 @@ class OpenLPClient: public QObject {
 
 		void slideListUpdate(QStringList, QStringList);
 
+		void songChanged(QString);
 };
 

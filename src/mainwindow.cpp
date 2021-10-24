@@ -29,7 +29,7 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent) {
 	const auto btnPrevSong = new QPushButton(tr("Previous Song (Left)"), this);
 	const auto btnPrevSlide = new QPushButton(tr("Previous Slide (Up)"), this);
 	const auto btnNextSlide = new QPushButton(tr("Next Slide (Down)"), this);
-	const auto btnNextSong = new QPushButton(tr("Next Song (Right))"), this);
+	const auto btnNextSong = new QPushButton(tr("Next Song (Right)"), this);
 	const auto btnBlankSlides = new QPushButton(tr("Blank Slides (,)"), this);
 	const auto btnShowSlides = new QPushButton(tr("Show Slides (.)"), this);
 	controlsLayout->addWidget(btnPrevSlide, 0, 0);
@@ -71,6 +71,7 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent) {
 	connect(btnObsShowSlides, &QPushButton::clicked, &m_openlpClient, &OpenLPClient::showSlides);
 	// setup status bar
 	setStatusBar(new QStatusBar(this));
+	connect(&m_openlpClient, &OpenLPClient::songChanged, this, &MainWindow::refreshStatusBar);
 	connect(&m_openlpClient, &OpenLPClient::pollUpdate, this, &MainWindow::openLpConnectionInit);
 	connect(&m_obsClient, &OBSClient::pollUpdate, this, &MainWindow::obsConnectionInit);
 	refreshStatusBar();

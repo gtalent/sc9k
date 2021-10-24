@@ -117,6 +117,7 @@ void OpenLPClient::handlePollResponse(QNetworkReply *reply) {
 	if (m_currentSongId != songId) {
 		requestSlideList();
 		m_currentSongId = songId;
+		emit songChanged(songId);
 	}
 	emit pollUpdate(m_songNameMap[songId], slide);
 }
