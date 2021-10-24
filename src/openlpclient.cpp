@@ -24,6 +24,15 @@ OpenLPClient::OpenLPClient(QObject *parent): QObject(parent) {
 	connect(m_pollingNam, &QNetworkAccessManager::finished, this, &OpenLPClient::handlePollResponse);
 }
 
+QString OpenLPClient::getNextSong() {
+	const auto currentSong = m_songNameMap[m_currentSongId];
+	const auto songIdx = m_songList.indexOf(currentSong) + 1;
+	if (songIdx < m_songList.size()) {
+		return m_songList[songIdx];
+	}
+	return "";
+}
+
 void OpenLPClient::nextSlide() {
 	get("/api/controller/live/next");
 }
@@ -131,18 +140,18 @@ void OpenLPClient::handleSongListResponse(QNetworkReply *reply) {
 	if (data.isEmpty()) {
 		return;
 	}
-	QStringList songList;
 	auto doc = QJsonDocument::fromJson(data);
 	auto items = doc.object()["results"].toObject()["items"].toArray();
 	m_songNameMap.clear();
+	m_songList.clear();
 	for (const auto &item : items) {
 		auto song = item.toObject();
 		auto name = song["title"].toString();
 		auto id = song["id"].toString();
 		m_songNameMap[id] = name;
-		songList.push_back(name);
+		m_songList.push_back(name);
 	}
-	emit songListUpdate(songList);
+	emit songListUpdate(m_songList);
 }
 
 void OpenLPClient::handleSlideListResponse(QNetworkReply *reply) {

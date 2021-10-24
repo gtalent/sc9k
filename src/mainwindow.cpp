@@ -108,7 +108,7 @@ void MainWindow::obsConnectionLost() {
 void MainWindow::refreshStatusBar() {
 	const auto openLpStatus = m_openLpConnected ? tr("OpenLP: Connected") : tr("OpenLP: Not Connected");
 	const auto obsStatus = m_obsConnected ? tr("OBS: Connected") : tr("OBS: Not Connected");
-	const auto nextSong = m_slideView->getNextSong();
+	const auto nextSong = m_openlpClient.getNextSong();
 	const auto nextSongTxt = m_openLpConnected ? " | Next Song: " + nextSong : "";
 	statusBar()->showMessage(openLpStatus + " | " + obsStatus + nextSongTxt);
 }

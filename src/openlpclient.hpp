@@ -30,13 +30,17 @@ class OpenLPClient: public QObject {
 		QNetworkAccessManager *m_slideListNam = new QNetworkAccessManager(this);
 		QTimer m_pollTimer;
 		QHash<QString, QString> m_songNameMap;
+		QStringList m_songList;
 		int m_currentServiceId = -1;
 		QString m_currentSongId;
 
 	public:
 		explicit OpenLPClient(QObject *parent = nullptr);
 
-	public slots:
+		[[nodiscard]]
+		QString getNextSong();
+
+   public slots:
 		void nextSlide();
 
 		void prevSlide();
