@@ -26,24 +26,26 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent) {
 	rootLyt->addWidget(m_slideView);
 	rootLyt->addLayout(controlsLayout);
 	// setup slide controls
+	const auto showHideLyt = new QHBoxLayout;
+	rootLyt->addLayout(showHideLyt);
 	const auto btnPrevSong = new QPushButton(tr("Previous Song (Left)"), this);
 	const auto btnPrevSlide = new QPushButton(tr("Previous Slide (Up)"), this);
 	const auto btnNextSlide = new QPushButton(tr("Next Slide (Down)"), this);
 	const auto btnNextSong = new QPushButton(tr("Next Song (Right)"), this);
 	const auto btnOpenLpHideSlides = new QPushButton(tr("Hide in Both (1)"), this);
-	const auto btnOpenLpShowSlides = new QPushButton(tr("Show in OpenLP (3)"), this);
-	controlsLayout->addWidget(btnPrevSlide, 0, 1);
-	controlsLayout->addWidget(btnNextSlide, 0, 2);
-	controlsLayout->addWidget(btnPrevSong, 0, 0);
-	controlsLayout->addWidget(btnNextSong, 0, 3);
-	controlsLayout->addWidget(btnOpenLpHideSlides, 1, 0);
-	controlsLayout->addWidget(btnOpenLpShowSlides, 1, 2);
+	const auto btnOpenLpShowSlides = new QPushButton(tr("Show in OpenLP Only (2)"), this);
+	controlsLayout->addWidget(btnPrevSlide, 0, 0);
+	controlsLayout->addWidget(btnNextSlide, 0, 1);
+	controlsLayout->addWidget(btnPrevSong, 1, 0);
+	controlsLayout->addWidget(btnNextSong, 1, 1);
+	showHideLyt->addWidget(btnOpenLpHideSlides);
+	showHideLyt->addWidget(btnOpenLpShowSlides);
 	btnNextSong->setShortcut(Qt::Key_Right);
 	btnPrevSong->setShortcut(Qt::Key_Left);
 	btnNextSlide->setShortcut(Qt::Key_Down);
 	btnPrevSlide->setShortcut(Qt::Key_Up);
 	btnOpenLpHideSlides->setShortcut(Qt::Key_1);
-	btnOpenLpShowSlides->setShortcut(Qt::Key_3);
+	btnOpenLpShowSlides->setShortcut(Qt::Key_2);
 	btnOpenLpHideSlides->setToolTip(tr("Also hides slides in OBS"));
 	connect(btnNextSlide, &QPushButton::clicked, &m_openlpClient, &OpenLPClient::nextSlide);
 	connect(btnPrevSlide, &QPushButton::clicked, &m_openlpClient, &OpenLPClient::prevSlide);
@@ -59,14 +61,11 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent) {
 	connect(m_slideView, &SlideView::songChanged, &m_openlpClient, &OpenLPClient::changeSong);
 	connect(m_slideView, &SlideView::slideChanged, &m_openlpClient, &OpenLPClient::changeSlide);
 	// setup scene selector
-	const auto btnObsHideSlides = new QPushButton(tr("Hide in OBS (2)"), mainWidget);
-	const auto btnObsShowSlides = new QPushButton(tr("Show in Both (4)"), mainWidget);
-	controlsLayout->addWidget(btnObsHideSlides, 1, 1);
-	controlsLayout->addWidget(btnObsShowSlides, 1, 3);
-	btnObsHideSlides->setShortcut(Qt::Key_2);
-	btnObsShowSlides->setShortcut(Qt::Key_4);
+	const auto btnObsShowSlides = new QPushButton(tr("Show in Both (3)"), mainWidget);
+	showHideLyt->addWidget(btnObsShowSlides);
+	btnObsShowSlides->setShortcut(Qt::Key_3);
 	btnObsShowSlides->setToolTip(tr("Also shows slides in OpenLP"));
-	connect(btnObsHideSlides, &QPushButton::clicked, &m_obsClient, &OBSClient::hideSlides);
+	connect(btnOpenLpShowSlides, &QPushButton::clicked, &m_obsClient, &OBSClient::hideSlides);
 	connect(btnObsShowSlides, &QPushButton::clicked, &m_obsClient, &OBSClient::showSlides);
 	connect(btnObsShowSlides, &QPushButton::clicked, &m_openlpClient, &OpenLPClient::showSlides);
 	// setup status bar
