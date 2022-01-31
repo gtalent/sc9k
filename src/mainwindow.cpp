@@ -64,7 +64,6 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent) {
 	const auto btnObsShowSlides = new QPushButton(tr("Show in Both (3)"), mainWidget);
 	showHideLyt->addWidget(btnObsShowSlides);
 	btnObsShowSlides->setShortcut(Qt::Key_3);
-	btnObsShowSlides->setToolTip(tr("Also shows slides in OpenLP"));
 	connect(btnOpenLpShowSlides, &QPushButton::clicked, &m_obsClient, &OBSClient::hideSlides);
 	connect(btnObsShowSlides, &QPushButton::clicked, &m_obsClient, &OBSClient::showSlides);
 	connect(btnObsShowSlides, &QPushButton::clicked, &m_openlpClient, &OpenLPClient::showSlides);
