@@ -16,7 +16,15 @@ else
 	HOST_ENV=${OS}-$(shell uname -m)
 endif
 
-ifeq ($(shell python -c 'import sys; print(sys.version_info[0])'),3)
+DEVENV=devenv$(shell pwd | sed 's/\//-/g')
+DEVENV_IMAGE=${PROJECT_NAME}-devenv
+ifneq ($(shell which docker 2> /dev/null),)
+	ifeq ($(shell docker inspect --format="{{.State.Status}}" ${DEVENV} 2>&1),running)
+		ENV_RUN=docker exec -i -t --user $(shell id -u ${USER}) ${DEVENV}
+	endif
+endif
+
+ifeq ($(shell ${ENV_RUN} python -c 'import sys; print(sys.version_info[0])'),3)
 	PYTHON3=python
 else
 	PYTHON3=python3
@@ -26,6 +34,7 @@ SCRIPTS=${BUILDCORE_PATH}/scripts
 SETUP_BUILD=${PYTHON3} ${SCRIPTS}/setup-build.py
 PYBB=${PYTHON3} ${SCRIPTS}/pybb.py
 CMAKE_BUILD=${PYBB} cmake-build
+CTEST=${PYBB} ctest-all
 RM_RF=${PYBB} rm
 ifdef USE_VCPKG
 	ifndef VCPKG_DIR_BASE
@@ -43,13 +52,6 @@ else
 endif
 
 VCPKG_DIR=$(VCPKG_DIR_BASE)/$(VCPKG_VERSION)-$(HOST_ENV)
-DEVENV=devenv$(shell pwd | sed 's/\//-/g')
-DEVENV_IMAGE=${PROJECT_NAME}-devenv
-ifneq ($(shell which docker 2> /dev/null),)
-	ifeq ($(shell docker inspect --format="{{.State.Status}}" ${DEVENV} 2>&1),running)
-		ENV_RUN=docker exec -i -t --user $(shell id -u ${USER}) ${DEVENV}
-	endif
-endif
 CURRENT_BUILD=$(HOST_ENV)-$(shell ${PYBB} cat .current_build)
 
 .PHONY: build
@@ -69,6 +71,12 @@ purge:
 .PHONY: test
 test: build
 	${ENV_RUN} ${CMAKE_BUILD} build test
+.PHONY: test-verbose
+test-verbose: build
+	${ENV_RUN} ${CTEST} build --output-on-failure
+.PHONY: test-rerun-verbose
+test-rerun-verbose: build
+	${ENV_RUN} ${CTEST} build --rerun-failed --output-on-failure
 
 .PHONY: devenv-image
 devenv-image:
@@ -89,11 +97,14 @@ devenv-create:
 .PHONY: devenv-destroy
 devenv-destroy:
 	docker rm -f ${DEVENV}
+ifdef ENV_RUN
 .PHONY: devenv-shell
 devenv-shell:
 	${ENV_RUN} bash
+endif
 
 ifdef USE_VCPKG
+
 .PHONY: vcpkg
 vcpkg: ${VCPKG_DIR} vcpkg-install
 
@@ -114,18 +125,20 @@ ifneq (${OS},windows)
 else
 	${VCPKG_DIR}/vcpkg install --triplet x64-windows ${VCPKG_PKGS}
 endif
-else # USE_VCPKG
+
+else # USE_VCPKG ################################################
 
 .PHONY: setup-conan
 conan-config:
-	conan profile new nostalgia --detect --force
+	${ENV_RUN} conan profile new ${PROJECT_NAME} --detect --force
 ifeq ($(OS),linux)
-	conan profile update settings.compiler.libcxx=libstdc++11 ${PROJECT_NAME}
+	${ENV_RUN} conan profile update settings.compiler.libcxx=libstdc++11 ${PROJECT_NAME}
 endif
 .PHONY: conan
 conan:
-	@mkdir -p .conanbuild && cd .conanbuild && conan install ../ --build=missing -pr=${PROJECT_NAME}
-endif # USE_VCPKG
+	${ENV_RUN} ${PYBB} conan-install ${PROJECT_NAME}
+	#@mkdir -p .conanbuild && cd .conanbuild && conan install ../ --build=missing -pr=${PROJECT_NAME}
+endif # USE_VCPKG ###############################################
 
 .PHONY: configure-xcode
 configure-xcode:
