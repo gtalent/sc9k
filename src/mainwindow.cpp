@@ -34,10 +34,10 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent) {
 	const auto btnNextSong = new QPushButton(tr("Next Song (Right)"), this);
 	const auto btnOpenLpHideSlides = new QPushButton(tr("Hide in Both (1)"), this);
 	const auto btnOpenLpShowSlides = new QPushButton(tr("Show in OpenLP Only (2)"), this);
-	controlsLayout->addWidget(btnPrevSlide, 0, 0);
-	controlsLayout->addWidget(btnNextSlide, 0, 1);
-	controlsLayout->addWidget(btnPrevSong, 1, 0);
-	controlsLayout->addWidget(btnNextSong, 1, 1);
+	controlsLayout->addWidget(btnPrevSlide, 0, 1);
+	controlsLayout->addWidget(btnNextSlide, 0, 2);
+	controlsLayout->addWidget(btnPrevSong, 0, 0);
+	controlsLayout->addWidget(btnNextSong, 0, 3);
 	showHideLyt->addWidget(btnOpenLpHideSlides);
 	showHideLyt->addWidget(btnOpenLpShowSlides);
 	btnNextSong->setShortcut(Qt::Key_Right);
