@@ -66,15 +66,21 @@ def main():
     build_dir = '{:s}/build/{:s}'.format(project_dir, build_config)
     rm(build_dir)
     mkdir(build_dir)
-    subprocess.run(['cmake', '-S', project_dir, '-B', build_dir, build_tool,
-                    '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',
-                    '-DCMAKE_TOOLCHAIN_FILE={:s}'.format(args.toolchain),
-                    '-DCMAKE_BUILD_TYPE={:s}'.format(build_type_arg),
-                    '-DUSE_ASAN={:s}'.format(sanitizer_status),
-                    '-DBUILDCORE_BUILD_CONFIG={:s}'.format(build_config),
-                    '-DBUILDCORE_TARGET={:s}'.format(args.target),
-                    qt_path,
-                    ])
+    cmake_cmd = [
+        'cmake', '-S', project_dir, '-B', build_dir, build_tool,
+        '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',
+        '-DCMAKE_TOOLCHAIN_FILE={:s}'.format(args.toolchain),
+        '-DCMAKE_BUILD_TYPE={:s}'.format(build_type_arg),
+        '-DUSE_ASAN={:s}'.format(sanitizer_status),
+        '-DBUILDCORE_BUILD_CONFIG={:s}'.format(build_config),
+        '-DBUILDCORE_TARGET={:s}'.format(args.target),
+    ]
+    if qt_path != '':
+        cmake_cmd.append(qt_path)
+    if platform.system() == 'Windows':
+        cmake_cmd.append('-A x64')
+
+    subprocess.run(cmake_cmd)
 
     mkdir('dist')
     if int(args.current_build) != 0:

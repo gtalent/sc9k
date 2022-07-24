@@ -24,10 +24,12 @@ ifneq ($(shell which docker 2> /dev/null),)
 	endif
 endif
 
-ifeq ($(shell ${ENV_RUN} python -c 'import sys; print(sys.version_info[0])'),3)
-	PYTHON3=python
-else
+ifneq ($(shell which python3 2> /dev/null),)
 	PYTHON3=python3
+else
+	ifeq ($(shell ${ENV_RUN} python -c 'import sys; print(sys.version_info[0])'),3)
+		PYTHON3=python
+	endif
 endif
 
 SCRIPTS=${BUILDCORE_PATH}/scripts
@@ -46,7 +48,7 @@ ifdef USE_VCPKG
 	VCPKG_TOOLCHAIN=--toolchain=${VCPKG_DIR}/scripts/buildsystems/vcpkg.cmake
 endif
 ifeq ($(OS),darwin)
-	DEBUGGER=lldb
+	DEBUGGER=lldb --
 else
 	DEBUGGER=gdb --args
 endif
@@ -126,18 +128,22 @@ else
 	${VCPKG_DIR}/vcpkg install --triplet x64-windows ${VCPKG_PKGS}
 endif
 
-else # USE_VCPKG ################################################
+else ifdef USE_CONAN # USE_VCPKG ################################################
 
 .PHONY: setup-conan
 conan-config:
 	${ENV_RUN} conan profile new ${PROJECT_NAME} --detect --force
 ifeq ($(OS),linux)
 	${ENV_RUN} conan profile update settings.compiler.libcxx=libstdc++11 ${PROJECT_NAME}
+else
+	${ENV_RUN} conan profile update settings.compiler.cppstd=20 ${PROJECT_NAME}
+ifeq ($(OS),windows)
+	${ENV_RUN} conan profile update settings.compiler.runtime=static ${PROJECT_NAME}
+endif
 endif
 .PHONY: conan
 conan:
 	${ENV_RUN} ${PYBB} conan-install ${PROJECT_NAME}
-	#@mkdir -p .conanbuild && cd .conanbuild && conan install ../ --build=missing -pr=${PROJECT_NAME}
 endif # USE_VCPKG ###############################################
 
 .PHONY: configure-xcode
