@@ -29,8 +29,8 @@ SlideView::SlideView(QWidget *parent): QWidget(parent) {
 #ifndef _WIN32
 	m_slideTable->setAlternatingRowColors(true);
 #endif
-	lyt->addWidget(m_songSelector);
 	lyt->addWidget(m_slideTable);
+	lyt->addWidget(m_songSelector);
 	connect(m_slideTable, &QTableWidget::currentCellChanged, this, &SlideView::slideChanged);
 }
 
@@ -44,7 +44,7 @@ QString SlideView::getNextSong() const {
 }
 
 void SlideView::pollUpdate(QString songName, int slide) {
-	auto songItems = m_songSelector->findItems(songName, Qt::MatchExactly);
+	auto songItems = m_songSelector->findItems(songName, Qt::MatchCaseSensitive);
 	if (songItems.size() < 1) {
 		return;
 	}
