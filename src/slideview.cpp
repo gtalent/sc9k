@@ -44,7 +44,7 @@ QString SlideView::getNextSong() const {
 }
 
 void SlideView::pollUpdate(QString songName, int slide) {
-	auto songItems = m_songSelector->findItems(songName, Qt::MatchCaseSensitive);
+	auto songItems = m_songSelector->findItems(songName, Qt::MatchFixedString);
 	if (songItems.size() < 1) {
 		return;
 	}
@@ -97,5 +97,5 @@ void SlideView::songListUpdate(QStringList songList) {
 	if (isReplacement) {
 		changeSong(0);
 	}
-	connect(m_songSelector, SIGNAL(currentIndexChanged(int)), this, SLOT(changeSong(int)));
+	connect(m_songSelector, &QListWidget::currentRowChanged, this, &SlideView::changeSong);
 }
