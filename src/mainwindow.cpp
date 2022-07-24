@@ -15,7 +15,7 @@
 
 MainWindow::MainWindow(QWidget *parent): QMainWindow(parent) {
 	move(0, 0);
-	setFixedSize(600, 555);
+	setFixedSize(590, 555);
 	setWindowTitle(tr("Slide Controller 9000"));
 	const auto mainWidget = new QWidget(this);
 	const auto rootLyt = new QVBoxLayout;

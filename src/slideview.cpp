@@ -8,15 +8,16 @@
 
 #include <QComboBox>
 #include <QDebug>
+#include <QHBoxLayout>
 #include <QHeaderView>
+#include <QListWidget>
 #include <QTableWidget>
-#include <QVBoxLayout>
 
 #include "slideview.hpp"
 
 SlideView::SlideView(QWidget *parent): QWidget(parent) {
-	auto lyt = new QVBoxLayout(this);
-	m_songSelector = new QComboBox(this);
+	auto lyt = new QHBoxLayout(this);
+	m_songSelector = new QListWidget(this);
 	m_slideTable = new QTableWidget(this);
 	auto header = m_slideTable->horizontalHeader();
 	header->setVisible(false);
@@ -35,17 +36,22 @@ SlideView::SlideView(QWidget *parent): QWidget(parent) {
 
 QString SlideView::getNextSong() const {
 	const auto cnt = m_songSelector->count();
-	const auto idx = m_songSelector->currentIndex() + 1;
+	const auto idx = m_songSelector->currentRow() + 1;
 	if (idx < cnt) {
-		return m_songSelector->itemText(idx);
+		return m_songSelector->currentItem()->text();
 	}
 	return "";
 }
 
 void SlideView::pollUpdate(QString songName, int slide) {
-	if (songName != m_currentSong) {
+	auto songItems = m_songSelector->findItems(songName, Qt::MatchExactly);
+	if (songItems.size() < 1) {
+		return;
+	}
+	auto songItem = songItems.first();
+	if (songItem != m_songSelector->currentItem()) {
 		m_currentSong = songName;
-		m_songSelector->setCurrentText(songName);
+		m_songSelector->setCurrentItem(songItem);
 	}
 	if (slide != m_currentSlide) {
 		m_currentSlide = slide;
@@ -54,7 +60,8 @@ void SlideView::pollUpdate(QString songName, int slide) {
 }
 
 void SlideView::changeSong(int song) {
-	if (m_songSelector->currentText() != m_currentSong) {
+	auto songItem = m_songSelector->item(song);
+	if (songItem->text() != m_currentSong) {
 		emit songChanged(song);
 	}
 }

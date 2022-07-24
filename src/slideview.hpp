@@ -13,12 +13,14 @@ class SlideView: public QWidget {
 	Q_OBJECT
 	private:
 		class QTableWidget *m_slideTable = nullptr;
-		class QComboBox *m_songSelector = nullptr;
+		class QListWidget *m_songSelector = nullptr;
 		QString m_currentSong;
 		int m_currentSlide = -1;
+
 	public:
 		explicit SlideView(QWidget *parent = nullptr);
 
+		[[nodiscard]]
 		QString getNextSong() const;
 
 	public slots:
