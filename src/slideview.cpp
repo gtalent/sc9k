@@ -91,7 +91,7 @@ void SlideView::songListUpdate(QStringList songList) {
 	// We want to reset the song to 0 upon replacement,
 	// but leave it alone upon initialization.
 	auto isReplacement = m_songSelector->count() > 0;
-	disconnect(m_songSelector, SIGNAL(currentIndexChanged(int)), this, SLOT(changeSong(int)));
+	disconnect(m_songSelector, &QListWidget::currentRowChanged, this, &SlideView::changeSong);
 	m_songSelector->clear();
 	m_songSelector->addItems(songList);
 	if (isReplacement) {
