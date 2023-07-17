@@ -1,5 +1,5 @@
 #
-#  Copyright 2016 - 2021 gary@drinkingtea.net
+#  Copyright 2016 - 2023 gary@drinkingtea.net
 #
 #  This Source Code Form is subject to the terms of the Mozilla Public
 #  License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -24,7 +24,7 @@ ifneq ($(shell which docker 2> /dev/null),)
 	endif
 endif
 
-ifneq ($(shell which python3 2> /dev/null),)
+ifneq ($(shell ${ENV_RUN} which python3 2> /dev/null),)
 	PYTHON3=python3
 else
 	ifeq ($(shell ${ENV_RUN} python -c 'import sys; print(sys.version_info[0])'),3)
@@ -36,8 +36,16 @@ SCRIPTS=${BUILDCORE_PATH}/scripts
 SETUP_BUILD=${PYTHON3} ${SCRIPTS}/setup-build.py
 PYBB=${PYTHON3} ${SCRIPTS}/pybb.py
 CMAKE_BUILD=${PYBB} cmake-build
+GET_ENV=${PYBB} getenv
 CTEST=${PYBB} ctest-all
 RM_RF=${PYBB} rm
+HOST=$(shell ${PYBB} hostname)
+BUILDCORE_HOST_SPECIFIC_BUILDPATH=$(shell ${GET_ENV} BUILDCORE_HOST_SPECIFIC_BUILDPATH)
+ifneq (${BUILDCORE_HOST_SPECIFIC_BUILDPATH},)
+BUILD_PATH=build/${HOST}
+else
+BUILD_PATH=build
+endif
 ifdef USE_VCPKG
 	ifndef VCPKG_DIR_BASE
 		VCPKG_DIR_BASE=.vcpkg
@@ -54,31 +62,32 @@ else
 endif
 
 VCPKG_DIR=$(VCPKG_DIR_BASE)/$(VCPKG_VERSION)-$(HOST_ENV)
-CURRENT_BUILD=$(HOST_ENV)-$(shell ${PYBB} cat .current_build)
+CURRENT_BUILD=$(HOST_ENV)-$(shell ${ENV_RUN} ${PYBB} cat .current_build)
 
 .PHONY: build
 build:
-	${ENV_RUN} ${CMAKE_BUILD} build
+	${ENV_RUN} ${CMAKE_BUILD} ${BUILD_PATH}
 .PHONY: install
 install:
-	${ENV_RUN} ${CMAKE_BUILD} build install
+	${ENV_RUN} ${CMAKE_BUILD} ${BUILD_PATH} install
 .PHONY: clean
 clean:
-	${ENV_RUN} ${CMAKE_BUILD} build clean
+	${ENV_RUN} ${CMAKE_BUILD} ${BUILD_PATH} clean
 .PHONY: purge
 purge:
 	${ENV_RUN} ${RM_RF} .current_build
-	${ENV_RUN} ${RM_RF} build
+	${ENV_RUN} ${RM_RF} ${BUILD_PATH}
 	${ENV_RUN} ${RM_RF} dist
 .PHONY: test
 test: build
-	${ENV_RUN} ${CMAKE_BUILD} build test
+	${ENV_RUN} mypy ${SCRIPTS}
+	${ENV_RUN} ${CMAKE_BUILD} ${BUILD_PATH} test
 .PHONY: test-verbose
 test-verbose: build
-	${ENV_RUN} ${CTEST} build --output-on-failure
+	${ENV_RUN} ${CTEST} ${BUILD_PATH} --output-on-failure
 .PHONY: test-rerun-verbose
 test-rerun-verbose: build
-	${ENV_RUN} ${CTEST} build --rerun-failed --output-on-failure
+	${ENV_RUN} ${CTEST} ${BUILD_PATH} --rerun-failed --output-on-failure
 
 .PHONY: devenv-image
 devenv-image:
@@ -146,19 +155,21 @@ conan:
 	${ENV_RUN} ${PYBB} conan-install ${PROJECT_NAME}
 endif # USE_VCPKG ###############################################
 
+ifeq (${OS},darwin)
 .PHONY: configure-xcode
 configure-xcode:
-	${ENV_RUN} ${SETUP_BUILD} ${VCPKG_TOOLCHAIN} --build_tool=xcode --current_build=0
+	${ENV_RUN} ${SETUP_BUILD} ${VCPKG_TOOLCHAIN} --build_tool=xcode --current_build=0 --build_root=${BUILD_PATH}
+endif
 
 .PHONY: configure-release
 configure-release:
-	${ENV_RUN} ${SETUP_BUILD} ${VCPKG_TOOLCHAIN} --build_type=release
+	${ENV_RUN} ${SETUP_BUILD} ${VCPKG_TOOLCHAIN} --build_type=release --build_root=${BUILD_PATH}
 
 .PHONY: configure-debug
 configure-debug:
-	${ENV_RUN} ${SETUP_BUILD} ${VCPKG_TOOLCHAIN} --build_type=debug
+	${ENV_RUN} ${SETUP_BUILD} ${VCPKG_TOOLCHAIN} --build_type=debug --build_root=${BUILD_PATH}
 
 .PHONY: configure-asan
 configure-asan:
-	${ENV_RUN} ${SETUP_BUILD} ${VCPKG_TOOLCHAIN} --build_type=asan
+	${ENV_RUN} ${SETUP_BUILD} ${VCPKG_TOOLCHAIN} --build_type=asan --build_root=${BUILD_PATH}
 

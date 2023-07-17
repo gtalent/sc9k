@@ -12,43 +12,24 @@
 #                     don't translate well to that other operating system
 
 import os
+import platform
 import shutil
 import subprocess
 import sys
+from typing import List, Optional
 
 
-def cat(paths: [str]) -> int:
-    for path in paths:
-        try:
-            with open(path) as f:
-                data = f.read()
-                sys.stdout.write(data)
-        except FileNotFoundError:
-            sys.stderr.write('cat: {}: no such file or directory\n'.format(path))
-            return 1
-    sys.stdout.write('\n')
-    return 0
-
-
-def mkdir(path: str) -> int:
+def mkdir(path: str):
     if not os.path.exists(path):
-        try:
-            os.mkdir(path)
-        except:
-            return 1
-        return 0
-    if os.path.isdir(path):
-        return 0
-    return 1
+        os.mkdir(path)
 
 
 # this exists because Windows is utterly incapable of providing a proper rm -rf
-def rm(path: str) -> int:
+def rm(path: str):
     if (os.path.exists(path) or os.path.islink(path)) and not os.path.isdir(path):
         os.remove(path)
     elif os.path.isdir(path):
         shutil.rmtree(path)
-    return 0
 
 
 def ctest_all() -> int:
@@ -66,12 +47,15 @@ def ctest_all() -> int:
     return 0
 
 
-def cmake_build(base_path: str, target: str) -> int:
+def cmake_build(base_path: str, target: Optional[str]) -> int:
     if not os.path.isdir(base_path):
         # nothing to build
         return 0
     for d in os.listdir(base_path):
-        args = ['cmake', '--build', os.path.join(base_path, d)]
+        path = os.path.join(base_path, d)
+        if not os.path.isdir(path):
+            continue
+        args = ['cmake', '--build', path]
         if target is not None:
             args.extend(['--target', target])
         err = subprocess.run(args).returncode
@@ -83,7 +67,11 @@ def cmake_build(base_path: str, target: str) -> int:
 def conan() -> int:
     project_name = sys.argv[2]
     conan_dir = '.conanbuild'
-    err = mkdir(conan_dir)
+    err = 0
+    try:
+        mkdir(conan_dir)
+    except:
+        return 1
     if err != 0:
         return err
     args = ['conan', 'install', '../', '--build=missing', '-pr', project_name]
@@ -94,10 +82,38 @@ def conan() -> int:
     return 0
 
 
-def main():
+def cat(paths: List[str]) -> int:
+    for path in paths:
+        try:
+            with open(path) as f:
+                data = f.read()
+                sys.stdout.write(data)
+        except FileNotFoundError:
+            sys.stderr.write('cat: {}: no such file or directory\n'.format(path))
+            return 1
+    sys.stdout.write('\n')
+    return 0
+
+
+def get_env(var_name: str) -> int:
+    if var_name not in os.environ:
+        return 1
+    sys.stdout.write(os.environ[var_name])
+    return 0
+
+
+def hostname() -> int:
+    sys.stdout.write(platform.node())
+    return 0
+
+
+def main() -> int:
     err = 0
     if sys.argv[1] == 'mkdir':
-        err = mkdir(sys.argv[2])
+        try:
+            mkdir(sys.argv[2])
+        except:
+            err = 1
     elif sys.argv[1] == 'rm':
         for i in range(2, len(sys.argv)):
             rm(sys.argv[i])
@@ -109,6 +125,10 @@ def main():
         err = cmake_build(sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else None)
     elif sys.argv[1] == 'cat':
         err = cat(sys.argv[2:])
+    elif sys.argv[1] == 'getenv':
+        err = get_env(sys.argv[2])
+    elif sys.argv[1] == 'hostname':
+        err = hostname()
     else:
         sys.stderr.write('Command not found\n')
         err = 1
@@ -117,7 +137,6 @@ def main():
 
 if __name__ == '__main__':
     try:
-        err = main()
-        sys.exit(err)
+        sys.exit(main())
     except KeyboardInterrupt:
         sys.exit(1)

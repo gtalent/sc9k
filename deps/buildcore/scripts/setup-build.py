@@ -18,12 +18,13 @@ import sys
 from pybb import mkdir, rm
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument('--target', help='Platform target',
                         default='{:s}-{:s}'.format(sys.platform, platform.machine()))
     parser.add_argument('--build_type', help='Build type (asan,debug,release)', default='release')
     parser.add_argument('--build_tool', help='Build tool (default,xcode)', default='')
+    parser.add_argument('--build_root', help='Path to the root of build directories (must be in project dir)', default='build')
     parser.add_argument('--toolchain', help='Path to CMake toolchain file', default='')
     parser.add_argument('--current_build', help='Indicates whether or not to make this the active build', default=1)
     args = parser.parse_args()
@@ -39,7 +40,7 @@ def main():
         sanitizer_status = 'OFF'
     else:
         print('Error: Invalid build tool')
-        sys.exit(1)
+        return 1
 
     if args.build_tool == 'xcode':
         build_config = '{:s}-{:s}'.format(args.target, args.build_tool)
@@ -60,12 +61,11 @@ def main():
         build_tool = '-GXcode'
     else:
         print('Error: Invalid build tool')
-        sys.exit(1)
+        return 1
 
     project_dir = os.getcwd()
-    build_dir = '{:s}/build/{:s}'.format(project_dir, build_config)
+    build_dir = '{:s}/{:s}/{:s}'.format(project_dir, args.build_root, build_config)
     rm(build_dir)
-    mkdir(build_dir)
     cmake_cmd = [
         'cmake', '-S', project_dir, '-B', build_dir, build_tool,
         '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',
@@ -90,11 +90,12 @@ def main():
 
     rm('compile_commands.json')
     if platform.system() != 'Windows':
-        os.symlink('build/{:s}/compile_commands.json'.format(build_config), 'compile_commands.json')
+        os.symlink('{:s}/compile_commands.json'.format(build_dir), 'compile_commands.json')
+    return 0
 
 
 if __name__ == '__main__':
     try:
-        main()
+        sys.exit(main())
     except KeyboardInterrupt:
         sys.exit(1)
