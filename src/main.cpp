@@ -7,10 +7,12 @@
  */
 
 #include <QApplication>
+#include <QSettings>
 
 #include "mainwindow.hpp"
 
 int main(int argc, char *argv[]) {
+	QSettings::setDefaultFormat(QSettings::Format::IniFormat);
 	QApplication a(argc, argv);
 	QApplication::setApplicationName(QObject::tr("Slide Controller 9000"));
 	MainWindow w;

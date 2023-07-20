@@ -33,7 +33,7 @@ class RqstHandler(BaseHTTPRequestHandler):
 
 
 def run(name):
-    httpd = HTTPServer(('127.0.0.1', 9302), RqstHandler)
+    httpd = HTTPServer(('0.0.0.0', 9302), RqstHandler)
     httpd.serve_forever()
 
 

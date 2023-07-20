@@ -8,17 +8,20 @@
 
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <QSettings>
 #include <QUrl>
 
+#include "settingsdata.hpp"
 #include "obsclient.hpp"
 
 OBSClient::OBSClient(QObject *parent): QObject(parent) {
+	setBaseUrl();
 	m_pollTimer.start(1000);
 	connect(&m_pollTimer, &QTimer::timeout, this, &OBSClient::poll);
 	connect(m_pollingNam, &QNetworkAccessManager::finished, this, &OBSClient::handlePollResponse);
 }
 
-void OBSClient::setScene(QString scene) {
+void OBSClient::setScene(QString const&scene) {
 	get(QString("/Scene?name=%1").arg(scene));
 }
 
@@ -30,7 +33,7 @@ void OBSClient::hideSlides() {
 	setScene("SpeakerScene");
 }
 
-void OBSClient::setSlidesVisible(int state) {
+void OBSClient::setSlidesVisible(bool state) {
 	if (state) {
 		setScene("MusicScene");
 	} else {
@@ -38,15 +41,20 @@ void OBSClient::setSlidesVisible(int state) {
 	}
 }
 
-void OBSClient::get(QString urlExt) {
-	QUrl url(QString(BaseUrl) + urlExt);
+void OBSClient::setBaseUrl() {
+	const auto [host, port] = getOBSConnectionData();
+	m_baseUrl = QString("http://%1:%2").arg(host, QString::number(port));
+}
+
+void OBSClient::get(QString const&urlExt) {
+	QUrl url(QString(m_baseUrl) + urlExt);
 	QNetworkRequest rqst(url);
 	auto reply = m_nam->get(rqst);
 	connect(reply, &QIODevice::readyRead, reply, &QObject::deleteLater);
 }
 
 void OBSClient::poll() {
-	QUrl url(QString(BaseUrl) + "/ping");
+	QUrl url(QString(m_baseUrl) + "/ping");
 	QNetworkRequest rqst(url);
 	m_pollingNam->get(rqst);
 }

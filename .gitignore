@@ -1,10 +1,13 @@
+.cache
 .clangd
 .conanbuild
 .current_build
+__pycache__
 CMakeLists.txt.user
 Session.vim
 build
 compile_commands.json
+cmake-build-debug
 dist
 graph_info.json
 tags

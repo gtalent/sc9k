@@ -24,11 +24,11 @@ class SlideView: public QWidget {
 		QString getNextSong() const;
 
 	public slots:
-		void pollUpdate(QString songId, int slideNum);
+		void pollUpdate(const QString& songId, int slideNum);
 
-		void songListUpdate(QStringList songList);
+		void songListUpdate(QStringList const&songList);
 
-		void slideListUpdate(QStringList tagList, QStringList songList);
+		void slideListUpdate(QStringList const&tagList, QStringList const&songList);
 
 		void reset();
 

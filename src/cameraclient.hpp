@@ -14,26 +14,20 @@
 
 #include "consts.hpp"
 
-class OBSClient: public QObject {
+class CameraClient: public QObject {
 	Q_OBJECT
 	private:
 		QString m_baseUrl;
-		QNetworkAccessManager *m_nam = new QNetworkAccessManager(this);
-		QNetworkAccessManager *m_pollingNam = new QNetworkAccessManager(this);
+		QNetworkAccessManager *const m_nam = new QNetworkAccessManager(this);
+		QNetworkAccessManager *const m_pollingNam = new QNetworkAccessManager(this);
 		QTimer m_pollTimer;
 
 	public:
-		explicit OBSClient(QObject *parent = nullptr);
+		explicit CameraClient(QObject *parent = nullptr);
+
+		void setPreset(int preset);
 
 	public slots:
-		void setScene(QString const&scene);
-
-		void showSlides();
-
-		void hideSlides();
-
-		void setSlidesVisible(bool state);
-
 		void setBaseUrl();
 
 	private:

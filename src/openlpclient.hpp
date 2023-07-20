@@ -19,11 +19,7 @@ class OpenLPClient: public QObject {
 	Q_OBJECT
 
 	private:
-		struct Song {
-			QString name;
-			QString id;
-		};
-		const QString BaseUrl = QString("http://") + SlideHost + ":4316";
+		QString m_baseUrl;
 		QNetworkAccessManager *m_nam = new QNetworkAccessManager(this);
 		QNetworkAccessManager *m_pollingNam = new QNetworkAccessManager(this);
 		QNetworkAccessManager *m_songListNam = new QNetworkAccessManager(this);
@@ -53,12 +49,16 @@ class OpenLPClient: public QObject {
 
 		void showSlides();
 
+		void setSlidesVisible(bool value);
+
 		void changeSong(int it);
 
 		void changeSlide(int slide);
 
+		void setBaseUrl();
+
 	private:
-		void get(QString url);
+		void get(QString const&url);
 
 		void requestSongList();
 

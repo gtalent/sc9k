@@ -6,7 +6,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-#include <QComboBox>
 #include <QDebug>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -43,9 +42,9 @@ QString SlideView::getNextSong() const {
 	return "";
 }
 
-void SlideView::pollUpdate(QString songName, int slide) {
+void SlideView::pollUpdate(QString const&songName, int slide) {
 	auto songItems = m_songSelector->findItems(songName, Qt::MatchFixedString);
-	if (songItems.size() < 1) {
+	if (songItems.empty()) {
 		return;
 	}
 	auto songItem = songItems.first();
@@ -66,11 +65,11 @@ void SlideView::changeSong(int song) {
 	}
 }
 
-void SlideView::slideListUpdate(QStringList tagList, QStringList slideList) {
+void SlideView::slideListUpdate(QStringList const&tagList, QStringList const&slideList) {
 	m_currentSlide = 0;
-	m_slideTable->setRowCount(slideList.size());
+	m_slideTable->setRowCount(static_cast<int>(slideList.size()));
 	for (int i = 0; i < slideList.size(); ++i) {
-		auto txt = slideList[i];
+		const auto& txt = slideList[i];
 		auto item = new QTableWidgetItem(txt);
 		item->setFlags(item->flags() & ~Qt::ItemIsEditable);
 		m_slideTable->setItem(i, 0, item);
@@ -86,7 +85,7 @@ void SlideView::reset() {
 	m_currentSlide = -1;
 }
 
-void SlideView::songListUpdate(QStringList songList) {
+void SlideView::songListUpdate(QStringList const&songList) {
 	// Is this replacing an existing song list or is it the initial song list?
 	// We want to reset the song to 0 upon replacement,
 	// but leave it alone upon initialization.

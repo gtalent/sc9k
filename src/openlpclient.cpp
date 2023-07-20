@@ -11,10 +11,13 @@
 #include <QJsonObject>
 #include <QJsonValueRef>
 #include <QNetworkReply>
+#include <QSettings>
 
+#include "settingsdata.hpp"
 #include "openlpclient.hpp"
 
 OpenLPClient::OpenLPClient(QObject *parent): QObject(parent) {
+	setBaseUrl();
 	poll();
 	m_pollTimer.start(250);
 	connect(&m_pollTimer, &QTimer::timeout, this, &OpenLPClient::poll);
@@ -57,6 +60,14 @@ void OpenLPClient::showSlides() {
 	get("/api/display/show");
 }
 
+void OpenLPClient::setSlidesVisible(bool value) {
+	if (value) {
+		showSlides();
+	} else {
+		blankScreen();
+	}
+}
+
 void OpenLPClient::changeSong(int it) {
 	auto n = QString::number(it);
 	auto url = "/api/service/set?data=%7B%22request%22%3A+%7B%22id%22%3A+" + n + "%7D%7D&_=1627181837297";
@@ -69,26 +80,31 @@ void OpenLPClient::changeSlide(int slide) {
 	get(url);
 }
 
-void OpenLPClient::get(QString urlExt) {
-	QUrl url(QString(BaseUrl) + urlExt);
+void OpenLPClient::setBaseUrl() {
+	const auto [host, port] = getOpenLPConnectionData();
+	m_baseUrl = QString("http://%1:%2").arg(host, QString::number(port));
+}
+
+void OpenLPClient::get(QString const&urlExt) {
+	QUrl url(m_baseUrl + urlExt);
 	QNetworkRequest rqst(url);
 	m_nam->get(rqst);
 }
 
 void OpenLPClient::requestSongList() {
-	QUrl url(QString(BaseUrl) + "/api/service/list?_=1626628079579");
+	QUrl url(m_baseUrl + "/api/service/list?_=1626628079579");
 	QNetworkRequest rqst(url);
 	m_songListNam->get(rqst);
 }
 
 void OpenLPClient::requestSlideList() {
-	QUrl url(QString(BaseUrl) + "/api/controller/live/text?_=1626628079579");
+	QUrl url(m_baseUrl + "/api/controller/live/text?_=1626628079579");
 	QNetworkRequest rqst(url);
 	m_slideListNam->get(rqst);
 }
 
 void OpenLPClient::poll() {
-	QUrl url(QString(BaseUrl) + "/api/poll?_=1626628079579");
+	QUrl url(m_baseUrl + "/api/poll?_=1626628079579");
 	QNetworkRequest rqst(url);
 	m_pollingNam->get(rqst);
 }

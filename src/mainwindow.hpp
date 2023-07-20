@@ -12,24 +12,45 @@
 
 #include <QMainWindow>
 
+#include "cameraclient.hpp"
 #include "obsclient.hpp"
 #include "openlpclient.hpp"
+#include "settingsdata.hpp"
 
 class MainWindow: public QMainWindow {
 	Q_OBJECT
 
 	private:
+		CameraClient m_cameraClient;
 		OBSClient m_obsClient;
 		OpenLPClient m_openlpClient;
 		class SlideView *m_slideView = nullptr;
+		bool m_cameraConnected = false;
 		bool m_openLpConnected = false;
 		bool m_obsConnected = false;
+		class QHBoxLayout *m_viewControlsParentLyt = nullptr;
+		class QWidget *m_viewControlsParent = nullptr;
+		class QWidget *m_viewControls = nullptr;
 
 	public:
 		explicit MainWindow(QWidget *parent = nullptr);
 		~MainWindow() override = default;
 
-	private slots:
+	private:
+		void setupMenu();
+
+		void setupDefaultViewControls(class QHBoxLayout *rootLyt);
+
+		void setupCustomViewControls(QVector<View> const&views, class QGridLayout *rootLyt);
+
+		void setupViewControls(class QVBoxLayout *rootLyt);
+
+		void openSettings();
+
+		void cameraConnectionInit();
+
+		void cameraConnectionLost();
+
 		void openLpConnectionInit();
 
 		void openLpConnectionLost();

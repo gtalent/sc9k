@@ -8,4 +8,3 @@
 
 #pragma once
 
-constexpr auto SlideHost = "192.168.254.61";

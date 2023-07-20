@@ -14,4 +14,4 @@ run: install
 	${ENV_RUN} ${PROJECT_EXECUTABLE}
 .PHONY: debug
 debug: install
-	${ENV_RUN} gdb --args ${PROJECT_EXECUTABLE}
+	${DEBUGGER} lldb -- ${PROJECT_EXECUTABLE}
