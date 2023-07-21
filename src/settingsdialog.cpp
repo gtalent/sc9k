@@ -102,7 +102,7 @@ QWidget *SettingsDialog::setupViewConfig(QWidget *parent) {
 		m_viewTable->setSelectionBehavior(QAbstractItemView::SelectionBehavior::SelectRows);
 		auto const hdr = m_viewTable->horizontalHeader();
 		m_viewTable->setColumnWidth(1, 70);
-		m_viewTable->setColumnWidth(2, 70);
+		m_viewTable->setColumnWidth(2, 75);
 		m_viewTable->setColumnWidth(3, 70);
 		hdr->setStretchLastSection(true);
 	}
