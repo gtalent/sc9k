@@ -50,34 +50,34 @@ QWidget *SettingsDialog::setupNetworkInputs(QWidget *parent) {
 	// camera settings
 	{
 		const auto c = getCameraConnectionData(settings);
-		m_cameraIpLe = new QLineEdit(root);
+		m_cameraHostLe = new QLineEdit(root);
 		m_cameraPortLe = new QLineEdit(root);
-		m_cameraIpLe->setText(c.host);
+		m_cameraHostLe->setText(c.host);
 		m_cameraPortLe->setText(QString::number(c.port));
 		m_cameraPortLe->setValidator(portValidator);
-		lyt->addRow(tr("C&amera IP Address:"), m_cameraIpLe);
+		lyt->addRow(tr("C&amera Host:"), m_cameraHostLe);
 		lyt->addRow(tr("Ca&mera Port:"), m_cameraPortLe);
 	}
 	// OpenLP settings
 	{
 		const auto c = getOpenLPConnectionData(settings);
-		m_openLpIpLe = new QLineEdit(root);
+		m_openLpHostLe = new QLineEdit(root);
 		m_openLpPortLe = new QLineEdit(root);
-		m_openLpIpLe->setText(c.host);
+		m_openLpHostLe->setText(c.host);
 		m_openLpPortLe->setText(QString::number(c.port));
 		m_openLpPortLe->setValidator(portValidator);
-		lyt->addRow(tr("Op&enLP IP Address:"), m_openLpIpLe);
+		lyt->addRow(tr("Op&enLP Host:"), m_openLpHostLe);
 		lyt->addRow(tr("Open&LP Port:"), m_openLpPortLe);
 	}
 	// OBS settings
 	{
 		const auto c = getOBSConnectionData(settings);
-		m_obsIpLe = new QLineEdit(root);
+		m_obsHostLe = new QLineEdit(root);
 		m_obsPortLe = new QLineEdit(root);
-		m_obsIpLe->setText(c.host);
+		m_obsHostLe->setText(c.host);
 		m_obsPortLe->setText(QString::number(c.port));
 		m_obsPortLe->setValidator(portValidator);
-		lyt->addRow(tr("O&BS IP Address:"), m_obsIpLe);
+		lyt->addRow(tr("O&BS Host:"), m_obsHostLe);
 		lyt->addRow(tr("OB&S Port:"), m_obsPortLe);
 	}
 	return root;
@@ -168,15 +168,15 @@ void SettingsDialog::handleOK() {
 	}
 	setViews(settings, views);
 	setCameraConnectionData(settings, {
-		.host = m_cameraIpLe->text(),
+		.host = m_cameraHostLe->text(),
 		.port = m_cameraPortLe->text().toUShort(),
 	});
 	setOpenLPConnectionData(settings, {
-		.host = m_openLpIpLe->text(),
+		.host = m_openLpHostLe->text(),
 		.port = m_openLpPortLe->text().toUShort(),
 	});
 	setOBSConnectionData(settings, {
-		.host = m_obsIpLe->text(),
+		.host = m_obsHostLe->text(),
 		.port = m_obsPortLe->text().toUShort(),
 	});
 	accept();

@@ -16,11 +16,11 @@ class SettingsDialog: public QDialog {
 	Q_OBJECT
 	private:
 		class QLabel *m_errLbl = nullptr;
-		class QLineEdit *m_cameraIpLe = nullptr;
+		class QLineEdit *m_cameraHostLe = nullptr;
 		class QLineEdit *m_cameraPortLe = nullptr;
-		class QLineEdit *m_openLpIpLe = nullptr;
+		class QLineEdit *m_openLpHostLe = nullptr;
 		class QLineEdit *m_openLpPortLe = nullptr;
-		class QLineEdit *m_obsIpLe = nullptr;
+		class QLineEdit *m_obsHostLe = nullptr;
 		class QLineEdit *m_obsPortLe = nullptr;
 		class QTableWidget *m_viewTable = nullptr;
 	public:
