@@ -28,6 +28,7 @@ class MainWindow: public QMainWindow {
 		bool m_cameraConnected = false;
 		bool m_openLpConnected = false;
 		bool m_obsConnected = false;
+		class QVBoxLayout *m_rootLyt = nullptr;
 		class QHBoxLayout *m_viewControlsParentLyt = nullptr;
 		class QWidget *m_viewControlsParent = nullptr;
 		class QWidget *m_viewControls = nullptr;
@@ -39,7 +40,7 @@ class MainWindow: public QMainWindow {
 	private:
 		void setupMenu();
 
-		void setupDefaultViewControls(class QHBoxLayout *rootLyt);
+		void setupDefaultViewControls(class QGridLayout *rootLyt);
 
 		void setupCustomViewControls(QVector<View> const&views, class QGridLayout *rootLyt);
 

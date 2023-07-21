@@ -22,13 +22,13 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent) {
 	setWindowTitle(tr("Slide Controller 9000"));
 	setupMenu();
 	const auto mainWidget = new QWidget(this);
-	const auto rootLyt = new QVBoxLayout;
+	m_rootLyt = new QVBoxLayout;
 	const auto controlsLayout = new QGridLayout;
 	m_slideView = new SlideView(this);
 	setCentralWidget(mainWidget);
-	mainWidget->setLayout(rootLyt);
-	rootLyt->addWidget(m_slideView);
-	rootLyt->addLayout(controlsLayout);
+	mainWidget->setLayout(m_rootLyt);
+	m_rootLyt->addWidget(m_slideView);
+	m_rootLyt->addLayout(controlsLayout);
 	// setup slide controls
 	const auto btnPrevSong = new QPushButton(tr("Previous Song (Left)"), this);
 	const auto btnPrevSlide = new QPushButton(tr("Previous Slide (Up)"), this);
@@ -47,7 +47,7 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent) {
 	btnPrevSong->setFixedWidth(135);
 	btnNextSlide->setFixedWidth(135);
 	btnPrevSlide->setFixedWidth(135);
-	setupViewControls(rootLyt);
+	setupViewControls(m_rootLyt);
 	connect(btnNextSlide, &QPushButton::clicked, &m_openlpClient, &OpenLPClient::nextSlide);
 	connect(btnPrevSlide, &QPushButton::clicked, &m_openlpClient, &OpenLPClient::prevSlide);
 	connect(btnNextSong, &QPushButton::clicked, &m_openlpClient, &OpenLPClient::nextSong);
@@ -86,14 +86,14 @@ void MainWindow::setupMenu() {
 	fileMenu->addAction(quitAct);
 }
 
-void MainWindow::setupDefaultViewControls(QHBoxLayout *viewCtlLyt) {
+void MainWindow::setupDefaultViewControls(QGridLayout *viewCtlLyt) {
 	auto const mainWidget = viewCtlLyt->parentWidget();
 	auto const btnHideSlides = new QPushButton(tr("1. Hide"), mainWidget);
 	auto const btnOpenLpShowSlides = new QPushButton(tr("2. Show in OpenLP Only"), mainWidget);
 	auto const btnShowSlides = new QPushButton(tr("3. Show"), mainWidget);
-	viewCtlLyt->addWidget(btnHideSlides);
-	viewCtlLyt->addWidget(btnOpenLpShowSlides);
-	viewCtlLyt->addWidget(btnShowSlides);
+	viewCtlLyt->addWidget(btnHideSlides, 0, 0);
+	viewCtlLyt->addWidget(btnOpenLpShowSlides, 0, 1);
+	viewCtlLyt->addWidget(btnShowSlides, 0, 2);
 	btnHideSlides->setShortcut(Qt::Key_1);
 	btnOpenLpShowSlides->setShortcut(Qt::Key_2);
 	btnHideSlides->setToolTip(tr("Also hides slides in OBS"));
@@ -158,7 +158,11 @@ void MainWindow::setupViewControls(QVBoxLayout *rootLyt) {
 			.obsSlides = false,
 		});
 	}
-	setupCustomViewControls(views, viewCtlLyt);
+	if (views.empty()) {
+		setupDefaultViewControls(viewCtlLyt);
+	} else {
+		setupCustomViewControls(views, viewCtlLyt);
+	}
 }
 
 void MainWindow::openSettings() {
@@ -168,6 +172,7 @@ void MainWindow::openSettings() {
 		m_cameraClient.setBaseUrl();
 		m_obsClient.setBaseUrl();
 		m_openlpClient.setBaseUrl();
+		setupViewControls(m_rootLyt);
 	}
 }
 
