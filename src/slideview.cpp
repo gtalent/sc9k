@@ -59,8 +59,11 @@ void SlideView::pollUpdate(QString const&songName, int slide) {
 }
 
 void SlideView::changeSong(int song) {
-	auto songItem = m_songSelector->item(song);
-	if (songItem->text() != m_currentSong) {
+	if (song < 0) {
+		return;
+	}
+	auto const songItem = m_songSelector->item(song);
+	if (songItem && songItem->text() != m_currentSong) {
 		emit songChanged(song);
 	}
 }
