@@ -42,7 +42,7 @@ void OBSClient::setSlidesVisible(bool state) {
 }
 
 void OBSClient::setBaseUrl() {
-	const auto [host, port] = getOBSConnectionData();
+	auto const [host, port] = getOBSConnectionData();
 	m_baseUrl = QString("http://%1:%2").arg(host, QString::number(port));
 }
 

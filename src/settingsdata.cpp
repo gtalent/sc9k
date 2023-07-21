@@ -121,7 +121,7 @@ void setViews(QVector<View> const&views) {
 QVector<View> getViews(QSettings &settings) {
 	QVector<View> out;
 	settings.beginGroup("Views");
-	const auto size = settings.beginReadArray("Views");
+	auto const size = settings.beginReadArray("Views");
 	for (auto i = 0; i < size; ++i) {
 		settings.setArrayIndex(i);
 		out.emplace_back(View{

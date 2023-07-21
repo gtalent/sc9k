@@ -26,7 +26,7 @@ void CameraClient::setPreset(int preset) {
 }
 
 void CameraClient::setBaseUrl() {
-	const auto [host, port] = getCameraConnectionData();
+	auto const [host, port] = getCameraConnectionData();
 	m_baseUrl = QString("http://%1:%2").arg(host, QString::number(port));
 }
 

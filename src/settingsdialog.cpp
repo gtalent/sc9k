@@ -31,8 +31,8 @@ enum ViewColumn {
 };
 
 SettingsDialog::SettingsDialog(QWidget *parent): QDialog(parent) {
-	const auto lyt = new QVBoxLayout(this);
-	const auto tabs = new QTabWidget(this);
+	auto const lyt = new QVBoxLayout(this);
+	auto const tabs = new QTabWidget(this);
 	lyt->addWidget(tabs);
 	tabs->addTab(setupViewConfig(tabs), tr("&Views"));
 	tabs->addTab(setupNetworkInputs(tabs), tr("&Network"));
@@ -41,13 +41,13 @@ SettingsDialog::SettingsDialog(QWidget *parent): QDialog(parent) {
 }
 
 QWidget *SettingsDialog::setupNetworkInputs(QWidget *parent) {
-	const auto root = new QWidget(parent);
-	const auto lyt = new QFormLayout(root);
-	const auto portValidator = new QIntValidator(1, 65536, this);
+	auto const root = new QWidget(parent);
+	auto const lyt = new QFormLayout(root);
+	auto const portValidator = new QIntValidator(1, 65536, this);
 	QSettings settings;
 	// camera settings
 	{
-		const auto c = getCameraConnectionData(settings);
+		auto const c = getCameraConnectionData(settings);
 		m_cameraHostLe = new QLineEdit(root);
 		m_cameraPortLe = new QLineEdit(root);
 		m_cameraHostLe->setText(c.host);
@@ -58,7 +58,7 @@ QWidget *SettingsDialog::setupNetworkInputs(QWidget *parent) {
 	}
 	// OpenLP settings
 	{
-		const auto c = getOpenLPConnectionData(settings);
+		auto const c = getOpenLPConnectionData(settings);
 		m_openLpHostLe = new QLineEdit(root);
 		m_openLpPortLe = new QLineEdit(root);
 		m_openLpHostLe->setText(c.host);
@@ -69,7 +69,7 @@ QWidget *SettingsDialog::setupNetworkInputs(QWidget *parent) {
 	}
 	// OBS settings
 	{
-		const auto c = getOBSConnectionData(settings);
+		auto const c = getOBSConnectionData(settings);
 		m_obsHostLe = new QLineEdit(root);
 		m_obsPortLe = new QLineEdit(root);
 		m_obsHostLe->setText(c.host);
@@ -132,7 +132,7 @@ QWidget *SettingsDialog::setupViewConfig(QWidget *parent) {
 			rmBtn->setEnabled(row > -1 && row < m_viewTable->rowCount());
 			addBtn->setEnabled(m_viewTable->rowCount() < MaxViews);
 		});
-		const auto views = getViews();
+		auto const views = getViews();
 		m_viewTable->setRowCount(static_cast<int>(views.size()));
 		for (auto row = 0; auto const&view : views) {
 			setupViewRow(row, view);
@@ -143,11 +143,11 @@ QWidget *SettingsDialog::setupViewConfig(QWidget *parent) {
 }
 
 QWidget *SettingsDialog::setupButtons(QWidget *parent) {
-	const auto root = new QWidget(parent);
-	const auto lyt = new QHBoxLayout(root);
+	auto const root = new QWidget(parent);
+	auto const lyt = new QHBoxLayout(root);
 	m_errLbl = new QLabel(root);
-	const auto okBtn = new QPushButton(tr("&OK"), root);
-	const auto cancelBtn = new QPushButton(tr("&Cancel"), root);
+	auto const okBtn = new QPushButton(tr("&OK"), root);
+	auto const cancelBtn = new QPushButton(tr("&Cancel"), root);
 	lyt->addWidget(m_errLbl);
 	lyt->addSpacerItem(new QSpacerItem(1000, 0, QSizePolicy::Expanding, QSizePolicy::Ignored));
 	lyt->addWidget(okBtn);
@@ -182,18 +182,18 @@ void SettingsDialog::handleOK() {
 
 void SettingsDialog::setupViewRow(int row, View const&view) {
 	// name
-	const auto nameItem = new QTableWidgetItem(view.name);
+	auto const nameItem = new QTableWidgetItem(view.name);
 	m_viewTable->setItem(row, ViewColumn::Name, nameItem);
 	// slides
-	const auto slidesCb = new QCheckBox(m_viewTable);
+	auto const slidesCb = new QCheckBox(m_viewTable);
 	slidesCb->setChecked(view.slides);
 	m_viewTable->setCellWidget(row, ViewColumn::Slides, slidesCb);
 	// obs slides
-	const auto obsSlidesCb = new QCheckBox(m_viewTable);
+	auto const obsSlidesCb = new QCheckBox(m_viewTable);
 	obsSlidesCb->setChecked(view.obsSlides);
 	m_viewTable->setCellWidget(row, ViewColumn::ObsSlides, obsSlidesCb);
 	// camera preset
-	const auto presetItem = new QTableWidgetItem(QString::number(view.cameraPreset));
+	auto const presetItem = new QTableWidgetItem(QString::number(view.cameraPreset));
 	m_viewTable->setItem(row, ViewColumn::CameraPreset, presetItem);
 }
 
@@ -206,7 +206,7 @@ int SettingsDialog::collectViews(QVector<View> &views) const {
 			m_errLbl->setText(tr("View %1 has no name.").arg(viewNo));
 			return 1;
 		}
-		const auto cameraPreset = m_viewTable->item(row, ViewColumn::CameraPreset)->text().toInt(&ok);
+		auto const cameraPreset = m_viewTable->item(row, ViewColumn::CameraPreset)->text().toInt(&ok);
 		if (!ok || cameraPreset < 1 || cameraPreset > MaxCameraPresets) {
 			m_errLbl->setText(tr("View %1 has invalid preset (1-%2)").arg(viewNo).arg(MaxCameraPresets));
 			return 2;

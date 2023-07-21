@@ -34,8 +34,8 @@ SlideView::SlideView(QWidget *parent): QWidget(parent) {
 }
 
 QString SlideView::getNextSong() const {
-	const auto cnt = m_songSelector->count();
-	const auto idx = m_songSelector->currentRow() + 1;
+	auto const cnt = m_songSelector->count();
+	auto const idx = m_songSelector->currentRow() + 1;
 	if (idx < cnt) {
 		return m_songSelector->currentItem()->text();
 	}
@@ -72,7 +72,7 @@ void SlideView::slideListUpdate(QStringList const&tagList, QStringList const&sli
 	m_currentSlide = 0;
 	m_slideTable->setRowCount(static_cast<int>(slideList.size()));
 	for (int i = 0; i < slideList.size(); ++i) {
-		const auto& txt = slideList[i];
+		auto const& txt = slideList[i];
 		auto item = new QTableWidgetItem(txt);
 		item->setFlags(item->flags() & ~Qt::ItemIsEditable);
 		m_slideTable->setItem(i, 0, item);

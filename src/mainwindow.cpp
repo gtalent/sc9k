@@ -22,19 +22,19 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent) {
 	setFixedSize(610, 555);
 	setWindowTitle(tr("Slide Controller 9000"));
 	setupMenu();
-	const auto mainWidget = new QWidget(this);
+	auto const mainWidget = new QWidget(this);
 	m_rootLyt = new QVBoxLayout;
-	const auto controlsLayout = new QGridLayout;
+	auto const controlsLayout = new QGridLayout;
 	m_slideView = new SlideView(this);
 	setCentralWidget(mainWidget);
 	mainWidget->setLayout(m_rootLyt);
 	m_rootLyt->addWidget(m_slideView);
 	m_rootLyt->addLayout(controlsLayout);
 	// setup slide controls
-	const auto btnPrevSong = new QPushButton(tr("Previous Song"), this);
-	const auto btnPrevSlide = new QPushButton(tr("Previous Slide"), this);
-	const auto btnNextSlide = new QPushButton(tr("Next Slide"), this);
-	const auto btnNextSong = new QPushButton(tr("Next Song"), this);
+	auto const btnPrevSong = new QPushButton(tr("Previous Song"), this);
+	auto const btnPrevSlide = new QPushButton(tr("Previous Slide"), this);
+	auto const btnNextSlide = new QPushButton(tr("Next Slide"), this);
+	auto const btnNextSong = new QPushButton(tr("Next Song"), this);
 	btnPrevSong->setToolTip(tr("Change to previous song (left arrow key)"));
 	btnPrevSlide->setToolTip(tr("Change to previous slide (up arrow key)"));
 	btnNextSong->setToolTip(tr("Change to next song (right arrow key)"));

@@ -28,8 +28,8 @@ OpenLPClient::OpenLPClient(QObject *parent): QObject(parent) {
 }
 
 QString OpenLPClient::getNextSong() {
-	const auto currentSong = m_songNameMap[m_currentSongId];
-	const auto songIdx = m_songList.indexOf(currentSong) + 1;
+	auto const currentSong = m_songNameMap[m_currentSongId];
+	auto const songIdx = m_songList.indexOf(currentSong) + 1;
 	if (songIdx < m_songList.size()) {
 		return m_songList[songIdx];
 	}
@@ -81,7 +81,7 @@ void OpenLPClient::changeSlide(int slide) {
 }
 
 void OpenLPClient::setBaseUrl() {
-	const auto [host, port] = getOpenLPConnectionData();
+	auto const [host, port] = getOpenLPConnectionData();
 	m_baseUrl = QString("http://%1:%2").arg(host, QString::number(port));
 }
 
@@ -160,7 +160,7 @@ void OpenLPClient::handleSongListResponse(QNetworkReply *reply) {
 	auto items = doc.object()["results"].toObject()["items"].toArray();
 	m_songNameMap.clear();
 	m_songList.clear();
-	for (const auto &item : items) {
+	for (auto const &item : items) {
 		auto song = item.toObject();
 		auto name = song["title"].toString();
 		auto id = song["id"].toString();
@@ -183,7 +183,7 @@ void OpenLPClient::handleSlideListResponse(QNetworkReply *reply) {
 	QStringList tagList;
 	auto doc = QJsonDocument::fromJson(data);
 	auto items = doc.object()["results"].toObject()["slides"].toArray();
-	for (const auto &item : items) {
+	for (auto const &item : items) {
 		auto slide = item.toObject();
 		auto text = slide["text"].toString();
 		auto tag = slide["tag"].toString();
