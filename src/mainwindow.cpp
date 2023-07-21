@@ -30,10 +30,14 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent) {
 	m_rootLyt->addWidget(m_slideView);
 	m_rootLyt->addLayout(controlsLayout);
 	// setup slide controls
-	const auto btnPrevSong = new QPushButton(tr("Previous Song (Left)"), this);
-	const auto btnPrevSlide = new QPushButton(tr("Previous Slide (Up)"), this);
-	const auto btnNextSlide = new QPushButton(tr("Next Slide (Down)"), this);
-	const auto btnNextSong = new QPushButton(tr("Next Song (Right)"), this);
+	const auto btnPrevSong = new QPushButton(tr("Previous Song"), this);
+	const auto btnPrevSlide = new QPushButton(tr("Previous Slide"), this);
+	const auto btnNextSlide = new QPushButton(tr("Next Slide"), this);
+	const auto btnNextSong = new QPushButton(tr("Next Song"), this);
+	btnPrevSong->setToolTip(tr("Change to previous song (left arrow key)"));
+	btnPrevSlide->setToolTip(tr("Change to previous slide (up arrow key)"));
+	btnNextSong->setToolTip(tr("Change to next song (right arrow key)"));
+	btnNextSlide->setToolTip(tr("Change to next slide (down arrow key)"));
 	controlsLayout->addWidget(btnPrevSlide, 0, 1);
 	controlsLayout->addWidget(btnNextSlide, 0, 2);
 	controlsLayout->addWidget(btnPrevSong, 0, 0);
