@@ -129,7 +129,7 @@ void MainWindow::setupMenu() {
 		connect(aboutAct, &QAction::triggered, &m_cameraClient, [this] {
 			QMessageBox about(this);
 			about.setText(tr(
-R"(Slide Controller 9000 - 1.0-beta
+R"(Slide Controller 9000 - 1.0-beta1
 Build date: %1
 
 Copyright 2021 - 2023 Gary Talent (gary@drinkingtea.net)
