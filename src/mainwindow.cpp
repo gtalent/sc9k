@@ -9,6 +9,7 @@
 #include <QApplication>
 #include <QHBoxLayout>
 #include <QMenuBar>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QStatusBar>
 
@@ -78,16 +79,66 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent) {
 
 void MainWindow::setupMenu() {
 	// file menu
-	auto const fileMenu = menuBar()->addMenu(tr("&File"));
-	auto const settingsAct = new QAction(tr("&Settings"), this);
-	auto const quitAct = new QAction(tr("E&xit"), this);
-	settingsAct->setShortcuts(QKeySequence::Preferences);
-	connect(settingsAct, &QAction::triggered, this, &MainWindow::openSettings);
-	quitAct->setShortcuts(QKeySequence::Quit);
-	quitAct->setStatusTip(tr("Exit application"));
-	connect(quitAct, &QAction::triggered, &QApplication::quit);
-	fileMenu->addAction(settingsAct);
-	fileMenu->addAction(quitAct);
+	{
+		auto const menu = menuBar()->addMenu(tr("&File"));
+		auto const settingsAct = new QAction(tr("&Settings"), this);
+		auto const quitAct = new QAction(tr("E&xit"), this);
+		settingsAct->setShortcuts(QKeySequence::Preferences);
+		connect(settingsAct, &QAction::triggered, this, &MainWindow::openSettings);
+		quitAct->setShortcuts(QKeySequence::Quit);
+		quitAct->setStatusTip(tr("Exit application"));
+		connect(quitAct, &QAction::triggered, &QApplication::quit);
+		menu->addAction(settingsAct);
+		menu->addAction(quitAct);
+	}
+	// slides menu
+	{
+		auto const menu = menuBar()->addMenu(tr("&Slides"));
+		auto const hideSlidesAct = new QAction(tr("&Hide Slides"), this);
+		hideSlidesAct->setShortcut(Qt::CTRL | Qt::Key_1);
+		connect(hideSlidesAct, &QAction::triggered, &m_openlpClient, &OpenLPClient::blankScreen);
+		connect(hideSlidesAct, &QAction::triggered, &m_obsClient, &OBSClient::hideSlides);
+		menu->addAction(hideSlidesAct);
+		auto const showSlidesInOpenLpAct = new QAction(tr("Show in &OpenLP Only"), this);
+		showSlidesInOpenLpAct->setShortcut(Qt::CTRL | Qt::Key_2);
+		connect(showSlidesInOpenLpAct, &QAction::triggered, &m_openlpClient, &OpenLPClient::showSlides);
+		connect(showSlidesInOpenLpAct, &QAction::triggered, &m_obsClient, &OBSClient::hideSlides);
+		menu->addAction(showSlidesInOpenLpAct);
+		auto const showSlidesAct = new QAction(tr("&Show Slides"), this);
+		showSlidesAct->setShortcut(Qt::CTRL | Qt::Key_3);
+		connect(showSlidesAct, &QAction::triggered, &m_obsClient, &OBSClient::showSlides);
+		connect(showSlidesAct, &QAction::triggered, &m_openlpClient, &OpenLPClient::showSlides);
+		menu->addAction(showSlidesAct);
+	}
+	// camera preset menu
+	{
+		auto const menu = menuBar()->addMenu(tr("&Camera Preset"));
+		for (auto i = 0; i < MaxCameraPresets; ++i) {
+			auto const cameraPresetAct = new QAction(tr("Camera Preset &%1").arg(i + 1), this);
+			cameraPresetAct->setShortcut(Qt::ALT | static_cast<Qt::Key>(Qt::Key_1 + i));
+			connect(cameraPresetAct, &QAction::triggered, &m_cameraClient, [this, i] {
+				m_cameraClient.setPreset(i + 1);
+			});
+			menu->addAction(cameraPresetAct);
+		}
+	}
+	// help menu
+	{
+		auto const menu = menuBar()->addMenu(tr("&Help"));
+		auto const aboutAct = new QAction(tr("&About"), this);
+		connect(aboutAct, &QAction::triggered, &m_cameraClient, [this] {
+			QMessageBox about(this);
+			about.setText(tr(
+R"(Slide Controller 9000 - 1.0-beta
+Build date: %1
+
+Copyright 2021 - 2023 Gary Talent (gary@drinkingtea.net)
+Slide Controller 9000 is released under the MPL 2.0
+Built on Qt library under LGPL 2.0)").arg(__DATE__));
+			about.exec();
+		});
+		menu->addAction(aboutAct);
+	}
 }
 
 void MainWindow::setupDefaultViewControls(QGridLayout *viewCtlLyt) {

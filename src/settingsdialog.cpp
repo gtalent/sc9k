@@ -19,10 +19,8 @@
 #include <QTableWidget>
 #include <QVBoxLayout>
 
+#include "consts.hpp"
 #include "settingsdialog.hpp"
-
-constexpr auto MaxPresets = 9;
-constexpr auto MaxViews = 9;
 
 enum ViewColumn {
 	Name = 0,
@@ -209,8 +207,8 @@ int SettingsDialog::collectViews(QVector<View> &views) const {
 			return 1;
 		}
 		const auto cameraPreset = m_viewTable->item(row, ViewColumn::CameraPreset)->text().toInt(&ok);
-		if (!ok || cameraPreset < 1 || cameraPreset > MaxPresets) {
-			m_errLbl->setText(tr("View %1 has invalid preset (1-%2)").arg(viewNo).arg(MaxPresets));
+		if (!ok || cameraPreset < 1 || cameraPreset > MaxCameraPresets) {
+			m_errLbl->setText(tr("View %1 has invalid preset (1-%2)").arg(viewNo).arg(MaxCameraPresets));
 			return 2;
 		}
 		views.emplace_back(View{

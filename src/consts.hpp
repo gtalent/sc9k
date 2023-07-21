@@ -8,3 +8,6 @@
 
 #pragma once
 
+constexpr auto MaxCameraPresets = 9;
+constexpr auto MaxViews = 9;
+
