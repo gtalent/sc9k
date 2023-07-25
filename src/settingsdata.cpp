@@ -8,7 +8,53 @@
 
 #include <QSettings>
 
+#include "consts.hpp"
 #include "settingsdata.hpp"
+
+void setVideoConfig(QSettings &settings, QVector<VideoConfig> const&vcList) {
+	settings.beginGroup("Camera");
+	settings.beginWriteArray("VideoImageConfig");
+	for (auto i = 0; auto const&vc : vcList) {
+		settings.setArrayIndex(i);
+		settings.setValue("brightness", vc.brightness);
+		settings.setValue("saturation", vc.saturation);
+		settings.setValue("contrast", vc.contrast);
+		settings.setValue("sharpness", vc.sharpness);
+		settings.setValue("hue", vc.hue);
+		++i;
+	}
+	settings.endArray();
+	settings.endGroup();
+}
+
+void setVideoConfig(QVector<VideoConfig> const&vcList) {
+	QSettings s;
+	setVideoConfig(s, vcList);
+}
+
+QVector<VideoConfig> getVideoConfig(QSettings &settings) {
+	QVector<VideoConfig> vc(MaxCameraPresets);
+	settings.beginGroup("Camera");
+	auto const size = std::min(settings.beginReadArray("VideoImageConfig"), MaxCameraPresets);
+	for (auto i = 0; i < size; ++i) {
+		settings.setArrayIndex(i);
+		vc[i] = {
+			.brightness = settings.value("brightness").toInt(),
+			.saturation = settings.value("saturation").toInt(),
+			.contrast = settings.value("contrast").toInt(),
+			.sharpness = settings.value("sharpness").toInt(),
+			.hue = settings.value("hue").toInt(),
+		};
+	}
+	settings.endArray();
+	settings.endGroup();
+	return vc;
+}
+
+QVector<VideoConfig> getVideoConfig() {
+	QSettings s;
+	return getVideoConfig(s);
+}
 
 void setCameraConnectionData(QSettings &settings, ConnectionData const&cd) {
 	settings.beginGroup("CameraClient");

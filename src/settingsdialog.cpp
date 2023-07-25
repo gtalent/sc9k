@@ -7,6 +7,7 @@
  */
 
 #include <QCheckBox>
+#include <QComboBox>
 #include <QFormLayout>
 #include <QHeaderView>
 #include <QIntValidator>
@@ -14,7 +15,9 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QSettings>
+#include <QSlider>
 #include <QSpacerItem>
+#include <QSpinBox>
 #include <QTabWidget>
 #include <QTableWidget>
 #include <QVBoxLayout>
@@ -34,6 +37,7 @@ SettingsDialog::SettingsDialog(QWidget *parent): QDialog(parent) {
 	auto const lyt = new QVBoxLayout(this);
 	auto const tabs = new QTabWidget(this);
 	lyt->addWidget(tabs);
+	tabs->addTab(setupImageConfig(tabs), tr("&Image"));
 	tabs->addTab(setupViewConfig(tabs), tr("&Views"));
 	tabs->addTab(setupNetworkInputs(tabs), tr("&Network"));
 	lyt->addWidget(setupButtons(this));
@@ -78,6 +82,32 @@ QWidget *SettingsDialog::setupNetworkInputs(QWidget *parent) {
 		lyt->addRow(tr("O&BS Host:"), m_obsHostLe);
 		lyt->addRow(tr("OB&S Port:"), m_obsPortLe);
 	}
+	return root;
+}
+
+QWidget *SettingsDialog::setupImageConfig(QWidget *parent) {
+	auto const root = new QWidget(parent);
+	auto const lyt = new QFormLayout(root);
+	m_videoConfig = getVideoConfig();
+	auto const mkSb = [parent, lyt](QString lbl) {
+		auto const s = new QSpinBox(parent);
+		s->setAlignment(Qt::AlignRight);
+		s->setRange(0, 14);
+		lyt->addRow(lbl, s);
+		return s;
+	};
+	auto const presetNo = new QComboBox(parent);
+	connect(presetNo, &QComboBox::currentIndexChanged, this, &SettingsDialog::updateVidConfigPreset);
+	for (auto i = 0; i < MaxCameraPresets; ++i) {
+		presetNo->addItem(tr("Camera Preset %1").arg(i + 1));
+	}
+	lyt->addRow(presetNo);
+	m_vidBrightness = mkSb(tr("&Brightness:"));
+	m_vidSaturation = mkSb(tr("&Saturation:"));
+	m_vidContrast = mkSb(tr("C&ontrast:"));
+	m_vidSharpness = mkSb(tr("Sh&arpness:"));
+	m_vidHue = mkSb(tr("&Hue:"));
+	updateVidConfigPreset(0);
 	return root;
 }
 
@@ -177,6 +207,8 @@ void SettingsDialog::handleOK() {
 		.host = m_obsHostLe->text(),
 		.port = m_obsPortLe->text().toUShort(),
 	});
+	collectVideoConfig();
+	setVideoConfig(settings, m_videoConfig);
 	accept();
 }
 
@@ -219,4 +251,39 @@ int SettingsDialog::collectViews(QVector<View> &views) const {
 		});
 	}
 	return 0;
+}
+
+void SettingsDialog::collectVideoConfig() {
+	auto &vc = m_videoConfig[m_vidCurrentPreset];
+	auto constexpr getVal = [](int &val, QSpinBox *src) {
+		if (src) {
+			val = src->value();
+		}
+	};
+	getVal(vc.brightness, m_vidBrightness);
+	getVal(vc.saturation, m_vidSaturation);
+	getVal(vc.contrast, m_vidContrast);
+	getVal(vc.sharpness, m_vidSharpness);
+	getVal(vc.hue, m_vidHue);
+}
+
+void SettingsDialog::updateVidConfigPreset(int preset) {
+	// update to new value
+	auto constexpr setVal = [](int val, QSpinBox *dst) {
+		if (dst) {
+			dst->setValue(val);
+		}
+	};
+	auto const&vc = m_videoConfig[preset];
+	setVal(vc.brightness, m_vidBrightness);
+	setVal(vc.saturation, m_vidSaturation);
+	setVal(vc.contrast, m_vidContrast);
+	setVal(vc.sharpness, m_vidSharpness);
+	setVal(vc.hue, m_vidHue);
+	m_vidCurrentPreset = preset;
+}
+
+void SettingsDialog::updateVidConfigPresetCollect(int preset) {
+	collectVideoConfig();
+	updateVidConfigPreset(preset);
 }

@@ -8,8 +8,25 @@
 
 #pragma once
 
+#include <QHash>
 #include <QString>
 #include <QVector>
+
+struct VideoConfig {
+	int brightness = 6;
+	int saturation = 4;
+	int contrast = 8;
+	int sharpness = 3;
+	int hue = 7;
+};
+
+void setVideoConfig(class QSettings &settings, QVector<VideoConfig> const&vc);
+
+void setVideoConfig(QVector<VideoConfig> const&vc);
+
+QVector<VideoConfig> getVideoConfig(QSettings &settings);
+
+QVector<VideoConfig> getVideoConfig();
 
 struct ConnectionData {
 	QString host;

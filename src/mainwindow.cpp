@@ -113,7 +113,7 @@ void MainWindow::setupMenu() {
 	// camera preset menu
 	{
 		auto const menu = menuBar()->addMenu(tr("&Camera Preset"));
-		for (auto i = 0; i < MaxCameraPresets; ++i) {
+		for (auto i = 0; i < std::min(9, MaxCameraPresets); ++i) {
 			auto const cameraPresetAct = new QAction(tr("Camera Preset &%1").arg(i + 1), this);
 			cameraPresetAct->setShortcut(Qt::ALT | static_cast<Qt::Key>(Qt::Key_1 + i));
 			connect(cameraPresetAct, &QAction::triggered, &m_cameraClient, [this, i] {
@@ -141,27 +141,7 @@ Built on Qt library under LGPL 2.0)").arg(__DATE__));
 	}
 }
 
-void MainWindow::setupDefaultViewControls(QGridLayout *viewCtlLyt) {
-	auto const mainWidget = viewCtlLyt->parentWidget();
-	auto const btnHideSlides = new QPushButton(tr("1. Hide"), mainWidget);
-	auto const btnOpenLpShowSlides = new QPushButton(tr("2. Show in OpenLP Only"), mainWidget);
-	auto const btnShowSlides = new QPushButton(tr("3. Show"), mainWidget);
-	viewCtlLyt->addWidget(btnHideSlides, 0, 0);
-	viewCtlLyt->addWidget(btnOpenLpShowSlides, 0, 1);
-	viewCtlLyt->addWidget(btnShowSlides, 0, 2);
-	btnHideSlides->setShortcut(Qt::Key_1);
-	btnOpenLpShowSlides->setShortcut(Qt::Key_2);
-	btnHideSlides->setToolTip(tr("Also hides slides in OBS"));
-	btnShowSlides->setShortcut(Qt::Key_3);
-	connect(btnHideSlides, &QPushButton::clicked, &m_openlpClient, &OpenLPClient::blankScreen);
-	connect(btnHideSlides, &QPushButton::clicked, &m_obsClient, &OBSClient::hideSlides);
-	connect(btnOpenLpShowSlides, &QPushButton::clicked, &m_openlpClient, &OpenLPClient::showSlides);
-	connect(btnOpenLpShowSlides, &QPushButton::clicked, &m_obsClient, &OBSClient::hideSlides);
-	connect(btnShowSlides, &QPushButton::clicked, &m_obsClient, &OBSClient::showSlides);
-	connect(btnShowSlides, &QPushButton::clicked, &m_openlpClient, &OpenLPClient::showSlides);
-}
-
-void MainWindow::setupCustomViewControls(QVector<View> const&views, QGridLayout *viewCtlLyt) {
+void MainWindow::setupViewControlButtons(QVector<View> const&views, QGridLayout *viewCtlLyt) {
 	constexpr auto columns = 3;
 	auto const parent = viewCtlLyt->parentWidget();
 	for (auto i = 0; auto const&view : views) {
@@ -203,8 +183,8 @@ void MainWindow::setupViewControls(QVBoxLayout *rootLyt) {
 				.obsSlides = false,
 		});
 		views.emplace_back(View{
-				.name = tr("Hide in OBS"),
-				.slides = false,
+				.name = tr("Show in OpenLP Only"),
+				.slides = true,
 				.obsSlides = false,
 		});
 		views.emplace_back(View{
@@ -213,11 +193,7 @@ void MainWindow::setupViewControls(QVBoxLayout *rootLyt) {
 			.obsSlides = false,
 		});
 	}
-	if (views.empty()) {
-		setupDefaultViewControls(viewCtlLyt);
-	} else {
-		setupCustomViewControls(views, viewCtlLyt);
-	}
+	setupViewControlButtons(views, viewCtlLyt);
 }
 
 void MainWindow::openSettings() {

@@ -27,10 +27,22 @@ class CameraClient: public QObject {
 
 		void setPreset(int preset);
 
+		void setBrightness(int val);
+
+		void setSaturation(int val);
+
+		void setContrast(int val);
+
+		void setSharpness(int val);
+
+		void setHue(int val);
+
 	public slots:
 		void setBaseUrl();
 
 	private:
+		void processVideoConfig(QNetworkReply*);
+
 		void get(QString const&url);
 
 		void poll();
