@@ -104,7 +104,7 @@ QWidget *SettingsDialog::setupImageConfig(QWidget *parent) {
 	lyt->addRow(presetNo);
 	m_vidBrightness = mkSb(tr("&Brightness:"));
 	m_vidSaturation = mkSb(tr("&Saturation:"));
-	m_vidContrast = mkSb(tr("C&ontrast:"));
+	m_vidContrast = mkSb(tr("Con&trast:"));
 	m_vidSharpness = mkSb(tr("Sh&arpness:"));
 	m_vidHue = mkSb(tr("&Hue:"));
 	updateVidConfigPreset(0);
