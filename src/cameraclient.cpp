@@ -25,7 +25,6 @@ void CameraClient::setPreset(int preset) {
 		get(QString("/cgi-bin/ptzctrl.cgi?ptzcmd&poscall&%1").arg(preset));
 		--preset;
 		auto const vc = getVideoConfig()[preset];
-		qDebug() << preset << vc.brightness;
 		setBrightness(vc.brightness);
 		setSaturation(vc.saturation);
 		setContrast(vc.contrast);
