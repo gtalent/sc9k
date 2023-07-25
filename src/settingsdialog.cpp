@@ -37,8 +37,8 @@ SettingsDialog::SettingsDialog(QWidget *parent): QDialog(parent) {
 	auto const lyt = new QVBoxLayout(this);
 	auto const tabs = new QTabWidget(this);
 	lyt->addWidget(tabs);
-	tabs->addTab(setupImageConfig(tabs), tr("&Image"));
 	tabs->addTab(setupViewConfig(tabs), tr("&Views"));
+	tabs->addTab(setupImageConfig(tabs), tr("&Image"));
 	tabs->addTab(setupNetworkInputs(tabs), tr("&Network"));
 	lyt->addWidget(setupButtons(this));
 	setFixedSize(440, 440);
