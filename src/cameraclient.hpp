@@ -41,8 +41,6 @@ class CameraClient: public QObject {
 		void setBaseUrl();
 
 	private:
-		void processVideoConfig(QNetworkReply*);
-
 		void get(QString const&url);
 
 		void poll();
