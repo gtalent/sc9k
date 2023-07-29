@@ -25,6 +25,8 @@ class CameraClient: public QObject {
 	public:
 		explicit CameraClient(QObject *parent = nullptr);
 
+		void setPresetVC(int preset, struct VideoConfig const&vc);
+
 		void setPreset(int preset);
 
 		void setBrightness(int val);

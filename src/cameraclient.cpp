@@ -20,11 +20,21 @@ CameraClient::CameraClient(QObject *parent): QObject(parent) {
 	connect(m_pollingNam, &QNetworkAccessManager::finished, this, &CameraClient::handlePollResponse);
 }
 
+void CameraClient::setPresetVC(int preset, VideoConfig const&vc) {
+	if (preset > 0 && preset < MaxCameraPresets) {
+		get(QString("/cgi-bin/ptzctrl.cgi?ptzcmd&poscall&%1").arg(preset));
+		setBrightness(vc.brightness);
+		setSaturation(vc.saturation);
+		setContrast(vc.contrast);
+		setSharpness(vc.sharpness);
+		setHue(vc.hue);
+	}
+}
+
 void CameraClient::setPreset(int preset) {
 	if (preset > 0 && preset < MaxCameraPresets) {
 		get(QString("/cgi-bin/ptzctrl.cgi?ptzcmd&poscall&%1").arg(preset));
-		--preset;
-		auto const vc = getVideoConfig()[preset];
+		auto const vc = getVideoConfig()[preset - 1];
 		setBrightness(vc.brightness);
 		setSaturation(vc.saturation);
 		setContrast(vc.contrast);

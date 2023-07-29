@@ -198,6 +198,7 @@ void MainWindow::setupViewControls(QVBoxLayout *rootLyt) {
 
 void MainWindow::openSettings() {
 	SettingsDialog d(this);
+	connect(&d, &SettingsDialog::previewPreset, &m_cameraClient, &CameraClient::setPreset);
 	auto const result = d.exec();
 	if (result == QDialog::Accepted) {
 		m_cameraClient.setBaseUrl();

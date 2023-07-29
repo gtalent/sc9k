@@ -15,7 +15,6 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QSettings>
-#include <QSlider>
 #include <QSpacerItem>
 #include <QSpinBox>
 #include <QTabWidget>
@@ -87,37 +86,56 @@ QWidget *SettingsDialog::setupNetworkInputs(QWidget *parent) {
 
 QWidget *SettingsDialog::setupImageConfig(QWidget *parent) {
 	auto const root = new QWidget(parent);
-	auto const lyt = new QFormLayout(root);
-	m_videoConfig = getVideoConfig();
-	auto const mkSb = [parent, lyt](QString lbl) {
-		auto const s = new QSpinBox(parent);
-		s->setAlignment(Qt::AlignRight);
-		s->setRange(0, 14);
-		lyt->addRow(lbl, s);
-		return s;
-	};
-	auto const presetNo = new QComboBox(parent);
-	connect(presetNo, &QComboBox::currentIndexChanged, this, &SettingsDialog::updateVidConfigPreset);
-	for (auto i = 0; i < MaxCameraPresets; ++i) {
-		presetNo->addItem(tr("Camera Preset %1").arg(i + 1));
+	auto const lyt = new QVBoxLayout(root);
+	{
+		auto const formRoot = new QWidget(parent);
+		auto const formLyt = new QFormLayout(formRoot);
+		lyt->addWidget(formRoot);
+		m_videoConfig = getVideoConfig();
+		auto const mkSb = [parent, formLyt](QString const&lbl) {
+			auto const s = new QSpinBox(parent);
+			s->setAlignment(Qt::AlignRight);
+			s->setRange(0, 14);
+			formLyt->addRow(lbl, s);
+			return s;
+		};
+		auto const presetNo = new QComboBox(parent);
+		connect(presetNo, &QComboBox::currentIndexChanged, this, &SettingsDialog::updateVidConfigPreset);
+		for (auto i = 0; i < MaxCameraPresets; ++i) {
+			presetNo->addItem(tr("Camera Preset %1").arg(i + 1));
+		}
+		formLyt->addRow(presetNo);
+		m_vidBrightness = mkSb(tr("&Brightness:"));
+		m_vidSaturation = mkSb(tr("&Saturation:"));
+		m_vidContrast = mkSb(tr("Con&trast:"));
+		m_vidSharpness = mkSb(tr("Sh&arpness:"));
+		m_vidHue = mkSb(tr("&Hue:"));
+		updateVidConfigPreset(0);
 	}
-	lyt->addRow(presetNo);
-	m_vidBrightness = mkSb(tr("&Brightness:"));
-	m_vidSaturation = mkSb(tr("&Saturation:"));
-	m_vidContrast = mkSb(tr("Con&trast:"));
-	m_vidSharpness = mkSb(tr("Sh&arpness:"));
-	m_vidHue = mkSb(tr("&Hue:"));
-	updateVidConfigPreset(0);
+	{
+		auto const btnRoot = new QWidget(parent);
+		auto const btnLyt = new QHBoxLayout(btnRoot);
+		lyt->addWidget(btnRoot);
+		btnLyt->setAlignment(Qt::AlignRight);
+		auto const previewBtn = new QPushButton(tr("&Preview"), btnRoot);
+		btnLyt->addWidget(previewBtn);
+		connect(previewBtn, &QPushButton::clicked, this, [this] {
+			this->collectVideoConfig();
+			auto const &vc = m_videoConfig[m_vidCurrentPreset];
+			emit previewPreset(m_vidCurrentPreset + 1, vc);
+		});
+	}
 	return root;
 }
 
 QWidget *SettingsDialog::setupViewConfig(QWidget *parent) {
 	auto const root = new QWidget(parent);
 	auto const lyt = new QVBoxLayout(root);
-	// table
-	m_viewTable = new QTableWidget(parent);
-	{
-		lyt->addWidget(m_viewTable);
+	auto const btnsRoot = new QWidget(root);
+	m_viewTable = new QTableWidget(root);
+	lyt->addWidget(btnsRoot);
+	lyt->addWidget(m_viewTable);
+	{ // table
 		QStringList columns;
 		columns.resize(ViewColumn::Count);
 		columns[ViewColumn::Name] = tr("Name");
@@ -134,19 +152,16 @@ QWidget *SettingsDialog::setupViewConfig(QWidget *parent) {
 		m_viewTable->setColumnWidth(3, 70);
 		hdr->setStretchLastSection(true);
 	}
-	// add/removes buttons
-	{
-		auto const btnsRoot = new QWidget(root);
+	{ // add/removes buttons
 		auto const btnsLyt = new QHBoxLayout(btnsRoot);
-		auto const addBtn = new QPushButton("+", btnsRoot);
-		auto const rmBtn = new QPushButton("-", btnsRoot);
-		addBtn->setFixedWidth(20);
-		rmBtn->setFixedWidth(20);
+		auto const addBtn = new QPushButton("&Add", btnsRoot);
+		auto const rmBtn = new QPushButton("&Remove", btnsRoot);
+		addBtn->setFixedWidth(70);
+		rmBtn->setFixedWidth(70);
 		rmBtn->setDisabled(true);
-		lyt->addWidget(btnsRoot);
 		btnsLyt->addWidget(addBtn);
 		btnsLyt->addWidget(rmBtn);
-		btnsLyt->addSpacerItem(new QSpacerItem(1000, 0, QSizePolicy::Expanding, QSizePolicy::Ignored));
+		btnsLyt->setAlignment(Qt::AlignLeft);
 		connect(addBtn, &QPushButton::clicked, this, [this, addBtn] {
 			auto const row = m_viewTable->rowCount();
 			m_viewTable->setRowCount(row + 1);

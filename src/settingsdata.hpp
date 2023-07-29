@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include <QHash>
+#include <cstdint>
 #include <QString>
 #include <QVector>
 
@@ -24,7 +24,7 @@ void setVideoConfig(class QSettings &settings, QVector<VideoConfig> const&vc);
 
 void setVideoConfig(QVector<VideoConfig> const&vc);
 
-QVector<VideoConfig> getVideoConfig(QSettings &settings);
+QVector<VideoConfig> getVideoConfig(class QSettings &settings);
 
 QVector<VideoConfig> getVideoConfig();
 

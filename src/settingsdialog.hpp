@@ -49,4 +49,6 @@ class SettingsDialog: public QDialog {
 		void collectVideoConfig();
 		void updateVidConfigPreset(int preset);
 		void updateVidConfigPresetCollect(int preset);
+	signals:
+		void previewPreset(int, VideoConfig const&);
 };
