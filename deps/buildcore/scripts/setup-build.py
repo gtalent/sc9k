@@ -17,11 +17,12 @@ import sys
 
 from pybb import mkdir, rm
 
+os_name = os.uname().sysname.lower()
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument('--target', help='Platform target',
-                        default='{:s}-{:s}'.format(sys.platform, platform.machine()))
+                        default='{:s}-{:s}'.format(os_name, platform.machine()))
     parser.add_argument('--build_type', help='Build type (asan,debug,release)', default='release')
     parser.add_argument('--build_tool', help='Build tool (default,xcode)', default='')
     parser.add_argument('--build_root', help='Path to the root of build directories (must be in project dir)', default='build')
