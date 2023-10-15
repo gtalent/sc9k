@@ -128,7 +128,7 @@ void MainWindow::setupMenu() {
 			confirm.setText(tr("Are you sure you want to reboot the camera? This will take about 20 seconds."));
 			confirm.addButton(tr("&No"), QMessageBox::ButtonRole::NoRole);
 			confirm.addButton(tr("&Yes"), QMessageBox::ButtonRole::YesRole);
-			if (confirm.exec() == QMessageBox::YesRole) {
+			if (confirm.exec()) {
 				m_cameraClient.reboot();
 			}
 		});
