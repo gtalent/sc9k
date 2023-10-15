@@ -6,6 +6,10 @@
 #  file, You can obtain one at http://mozilla.org/MPL/2.0/.
 #
 
+ifndef USE_CONAN
+	USE_CONAN=0
+endif
+
 ifeq (${OS},Windows_NT)
 	SHELL := powershell.exe
 	.SHELLFLAGS := -NoProfile -Command
@@ -78,6 +82,7 @@ purge:
 	${ENV_RUN} ${RM_RF} .current_build
 	${ENV_RUN} ${RM_RF} ${BUILD_PATH}
 	${ENV_RUN} ${RM_RF} dist
+	${ENV_RUN} ${RM_RF} compile_commands.json
 .PHONY: test
 test: build
 	${ENV_RUN} mypy ${SCRIPTS}
@@ -129,6 +134,8 @@ else
 	${ENV_RUN} ${VCPKG_DIR}/bootstrap-vcpkg.bat
 endif
 
+endif
+
 .PHONY: vcpkg-install
 vcpkg-install:
 ifneq (${OS},windows)
@@ -137,39 +144,30 @@ else
 	${VCPKG_DIR}/vcpkg install --triplet x64-windows ${VCPKG_PKGS}
 endif
 
-else ifdef USE_CONAN # USE_VCPKG ################################################
-
-.PHONY: setup-conan
+ifeq (${USE_CONAN},1) # USE_CONAN ################################################
+.PHONY: conan-config
 conan-config:
-	${ENV_RUN} conan profile new ${PROJECT_NAME} --detect --force
-ifeq ($(OS),linux)
-	${ENV_RUN} conan profile update settings.compiler.libcxx=libstdc++11 ${PROJECT_NAME}
-else
-	${ENV_RUN} conan profile update settings.compiler.cppstd=20 ${PROJECT_NAME}
-ifeq ($(OS),windows)
-	${ENV_RUN} conan profile update settings.compiler.runtime=static ${PROJECT_NAME}
-endif
-endif
+	${ENV_RUN} conan profile detect -f --name ${PROJECT_NAME}
 .PHONY: conan
 conan:
 	${ENV_RUN} ${PYBB} conan-install ${PROJECT_NAME}
-endif # USE_VCPKG ###############################################
+endif # USE_CONAN ###############################################
 
 ifeq (${OS},darwin)
 .PHONY: configure-xcode
 configure-xcode:
-	${ENV_RUN} ${SETUP_BUILD} ${VCPKG_TOOLCHAIN} --build_tool=xcode --current_build=0 --build_root=${BUILD_PATH}
+	${ENV_RUN} ${SETUP_BUILD} ${VCPKG_TOOLCHAIN} --build_tool=xcode --current_build=0 --build_root=${BUILD_PATH} --use_conan=${USE_CONAN}
 endif
 
 .PHONY: configure-release
 configure-release:
-	${ENV_RUN} ${SETUP_BUILD} ${VCPKG_TOOLCHAIN} --build_type=release --build_root=${BUILD_PATH}
+	${ENV_RUN} ${SETUP_BUILD} ${VCPKG_TOOLCHAIN} --build_type=release --build_root=${BUILD_PATH} --use_conan=${USE_CONAN}
 
 .PHONY: configure-debug
 configure-debug:
-	${ENV_RUN} ${SETUP_BUILD} ${VCPKG_TOOLCHAIN} --build_type=debug --build_root=${BUILD_PATH}
+	${ENV_RUN} ${SETUP_BUILD} ${VCPKG_TOOLCHAIN} --build_type=debug --build_root=${BUILD_PATH} --use_conan=${USE_CONAN}
 
 .PHONY: configure-asan
 configure-asan:
-	${ENV_RUN} ${SETUP_BUILD} ${VCPKG_TOOLCHAIN} --build_type=asan --build_root=${BUILD_PATH}
+	${ENV_RUN} ${SETUP_BUILD} ${VCPKG_TOOLCHAIN} --build_type=asan --build_root=${BUILD_PATH} --use_conan=${USE_CONAN}
 

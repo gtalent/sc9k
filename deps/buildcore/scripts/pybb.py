@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 
 #
-#  Copyright 2016 - 2021 gary@drinkingtea.net
+#  Copyright 2016 - 2023 gary@drinkingtea.net
 #
 #  This Source Code Form is subject to the terms of the Mozilla Public
 #  License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -74,7 +74,7 @@ def conan() -> int:
         return 1
     if err != 0:
         return err
-    args = ['conan', 'install', '../', '--build=missing', '-pr', project_name]
+    args = ['conan', 'install', '../', '-of', '.', '--build=missing', '-pr', project_name]
     os.chdir(conan_dir)
     err = subprocess.run(args).returncode
     if err != 0:

@@ -112,7 +112,7 @@ void MainWindow::setupMenu() {
 	}
 	// camera preset menu
 	{
-		auto const menu = menuBar()->addMenu(tr("&Camera Preset"));
+		auto const menu = menuBar()->addMenu(tr("&Camera"));
 		for (auto i = 0; i < std::min(9, MaxCameraPresets); ++i) {
 			auto const cameraPresetAct = new QAction(tr("Camera Preset &%1").arg(i + 1), this);
 			cameraPresetAct->setShortcut(Qt::ALT | static_cast<Qt::Key>(Qt::Key_1 + i));
@@ -121,6 +121,18 @@ void MainWindow::setupMenu() {
 			});
 			menu->addAction(cameraPresetAct);
 		}
+		menu->addSeparator();
+		auto const rebootAct = new QAction(tr("&Reboot"), this);
+		connect(rebootAct, &QAction::triggered, &m_cameraClient, [this] {
+			QMessageBox confirm(this);
+			confirm.setText(tr("Are you sure you want to reboot the camera? This will take about 20 seconds."));
+			confirm.addButton(tr("&No"), QMessageBox::ButtonRole::NoRole);
+			confirm.addButton(tr("&Yes"), QMessageBox::ButtonRole::YesRole);
+			if (confirm.exec() == QMessageBox::YesRole) {
+				m_cameraClient.reboot();
+			}
+		});
+		menu->addAction(rebootAct);
 	}
 	// help menu
 	{

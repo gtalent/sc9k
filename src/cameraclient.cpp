@@ -73,6 +73,11 @@ void CameraClient::setHue(int val) {
 	}
 }
 
+void CameraClient::reboot() {
+	post("/cgi-bin/param.cgi?post_reboot");
+	emit pollFailed();
+}
+
 void CameraClient::setBaseUrl() {
 	auto const [host, port] = getCameraConnectionData();
 	m_baseUrl = QString("http://%1:%2").arg(host, QString::number(port));
@@ -81,7 +86,14 @@ void CameraClient::setBaseUrl() {
 void CameraClient::get(QString const&urlExt) {
 	QUrl url(QString(m_baseUrl) + urlExt);
 	QNetworkRequest rqst(url);
-	auto reply = m_nam->get(rqst);
+	auto const reply = m_nam->get(rqst);
+	connect(reply, &QIODevice::readyRead, reply, &QObject::deleteLater);
+}
+
+void CameraClient::post(QString const&urlExt) {
+	QUrl url(QString(m_baseUrl) + urlExt);
+	QNetworkRequest rqst(url);
+	auto const reply = m_nam->post(rqst, QByteArray{});
 	connect(reply, &QIODevice::readyRead, reply, &QObject::deleteLater);
 }
 

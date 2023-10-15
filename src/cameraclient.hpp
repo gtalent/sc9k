@@ -39,11 +39,15 @@ class CameraClient: public QObject {
 
 		void setHue(int val);
 
+		void reboot();
+
 	public slots:
 		void setBaseUrl();
 
 	private:
 		void get(QString const&url);
+
+		void post(QString const&url);
 
 		void poll();
 

@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 
 #
-#  Copyright 2016 - 2021 gary@drinkingtea.net
+#  Copyright 2016 - 2023 gary@drinkingtea.net
 #
 #  This Source Code Form is subject to the terms of the Mozilla Public
 #  License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -28,6 +28,7 @@ def main() -> int:
     parser.add_argument('--build_root', help='Path to the root of build directories (must be in project dir)', default='build')
     parser.add_argument('--toolchain', help='Path to CMake toolchain file', default='')
     parser.add_argument('--current_build', help='Indicates whether or not to make this the active build', default=1)
+    parser.add_argument('--use_conan', help='Indicates whether or not should use .conanbuild/conan_toolchain.cmake', default='0')
     args = parser.parse_args()
 
     if args.build_type == 'asan':
@@ -76,6 +77,8 @@ def main() -> int:
         '-DBUILDCORE_BUILD_CONFIG={:s}'.format(build_config),
         '-DBUILDCORE_TARGET={:s}'.format(args.target),
     ]
+    if args.use_conan != '0':
+        cmake_cmd.append('-DCMAKE_TOOLCHAIN_FILE={:s}'.format('.conanbuild/conan_toolchain.cmake'))
     if qt_path != '':
         cmake_cmd.append(qt_path)
     if platform.system() == 'Windows':
