@@ -56,7 +56,7 @@ QWidget *SettingsDialog::setupNetworkInputs(QWidget *parent) {
 		m_cameraHostLe->setText(c.host);
 		m_cameraPortLe->setText(QString::number(c.port));
 		m_cameraPortLe->setValidator(portValidator);
-		lyt->addRow(tr("C&amera Host:"), m_cameraHostLe);
+		lyt->addRow(tr("Camera &Host:"), m_cameraHostLe);
 		lyt->addRow(tr("Ca&mera Port:"), m_cameraPortLe);
 	}
 	// OpenLP settings
@@ -108,7 +108,7 @@ QWidget *SettingsDialog::setupImageConfig(QWidget *parent) {
 		m_vidBrightness = mkSb(tr("&Brightness:"));
 		m_vidSaturation = mkSb(tr("&Saturation:"));
 		m_vidContrast = mkSb(tr("Con&trast:"));
-		m_vidSharpness = mkSb(tr("Sh&arpness:"));
+		m_vidSharpness = mkSb(tr("Sharpn&ess:"));
 		m_vidHue = mkSb(tr("&Hue:"));
 		updateVidConfigPreset(0);
 	}
@@ -154,7 +154,7 @@ QWidget *SettingsDialog::setupViewConfig(QWidget *parent) {
 	}
 	{ // add/removes buttons
 		auto const btnsLyt = new QHBoxLayout(btnsRoot);
-		auto const addBtn = new QPushButton("&Add", btnsRoot);
+		auto const addBtn = new QPushButton("A&dd", btnsRoot);
 		auto const rmBtn = new QPushButton("&Remove", btnsRoot);
 		addBtn->setFixedWidth(70);
 		rmBtn->setFixedWidth(70);
@@ -192,17 +192,20 @@ QWidget *SettingsDialog::setupButtons(QWidget *parent) {
 	auto const lyt = new QHBoxLayout(root);
 	m_errLbl = new QLabel(root);
 	auto const okBtn = new QPushButton(tr("&OK"), root);
+	auto const applyBtn = new QPushButton(tr("&Apply"), root);
 	auto const cancelBtn = new QPushButton(tr("&Cancel"), root);
 	lyt->addWidget(m_errLbl);
 	lyt->addSpacerItem(new QSpacerItem(1000, 0, QSizePolicy::Expanding, QSizePolicy::Ignored));
 	lyt->addWidget(okBtn);
+	lyt->addWidget(applyBtn);
 	lyt->addWidget(cancelBtn);
 	connect(okBtn, &QPushButton::clicked, this, &SettingsDialog::handleOK);
+	connect(applyBtn, &QPushButton::clicked, this, &SettingsDialog::handleApply);
 	connect(cancelBtn, &QPushButton::clicked, this, &SettingsDialog::reject);
 	return root;
 }
 
-void SettingsDialog::handleOK() {
+void SettingsDialog::handleApply() {
 	QSettings settings;
 	QVector<View> views;
 	auto const viewsErr = collectViews(views);
@@ -224,6 +227,10 @@ void SettingsDialog::handleOK() {
 	});
 	collectVideoConfig();
 	setVideoConfig(settings, m_videoConfig);
+}
+
+void SettingsDialog::handleOK() {
+	handleApply();
 	accept();
 }
 
