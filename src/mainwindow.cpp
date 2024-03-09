@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 - 2023 gary@drinkingtea.net
+ * Copyright 2021 - 2024 gary@drinkingtea.net
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -141,12 +141,12 @@ void MainWindow::setupMenu() {
 		connect(aboutAct, &QAction::triggered, &m_cameraClient, [this] {
 			QMessageBox about(this);
 			about.setText(tr(
-R"(Slide Controller 9000 - 1.0-beta4
-Build date: %1
+R"(Slide Controller 9000 - %1
+Build date: %2
 
-Copyright 2021 - 2023 Gary Talent (gary@drinkingtea.net)
+Copyright 2021 - 2024 Gary Talent (gary@drinkingtea.net)
 Slide Controller 9000 is released under the MPL 2.0
-Built on Qt library under LGPL 2.0)").arg(__DATE__));
+Built on Qt library under LGPL 2.0)").arg(Version, __DATE__));
 			about.exec();
 		});
 		menu->addAction(aboutAct);
