@@ -6,6 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+#include <QHttpPart>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -37,19 +38,19 @@ QString OpenLPClient::getNextSong() {
 }
 
 void OpenLPClient::nextSlide() {
-	get("/api/controller/live/next");
+	post("/api/v2/controller/progress", R"({"action":"next"})");
 }
 
 void OpenLPClient::prevSlide() {
-	get("/api/controller/live/previous");
+	post("/api/v2/controller/progress", R"({"action":"previous"})");
 }
 
 void OpenLPClient::nextSong() {
-	get("/api/service/next");
+	post("/api/v2/service/progress", R"({"action":"next"})");
 }
 
 void OpenLPClient::prevSong() {
-	get("/api/service/previous");
+	post("/api/v2/service/progress", R"({"action":"previous"})");
 }
 
 void OpenLPClient::blankScreen() {
@@ -89,6 +90,12 @@ void OpenLPClient::get(QString const&urlExt) {
 	QUrl url(m_baseUrl + urlExt);
 	QNetworkRequest rqst(url);
 	m_nam->get(rqst);
+}
+
+void OpenLPClient::post(QString const&url, QString const&data) {
+	QNetworkRequest rqst(QUrl(m_baseUrl + url));
+	rqst.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+	m_nam->post(rqst, data.toUtf8());
 }
 
 void OpenLPClient::requestSongList() {

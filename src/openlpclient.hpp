@@ -60,6 +60,8 @@ class OpenLPClient: public QObject {
 	private:
 		void get(QString const&url);
 
+		void post(QString const&url, QString const&data);
+
 		void requestSongList();
 
 		void requestSlideList();
