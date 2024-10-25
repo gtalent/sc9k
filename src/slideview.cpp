@@ -43,7 +43,7 @@ QString SlideView::getNextSong() const {
 }
 
 void SlideView::pollUpdate(QString const&songName, int slide) {
-	auto songItems = m_songSelector->findItems(songName, Qt::MatchFixedString);
+	auto const songItems = m_songSelector->findItems(songName, Qt::MatchFixedString);
 	if (songItems.empty()) {
 		return;
 	}
@@ -68,7 +68,10 @@ void SlideView::changeSong(int song) {
 	}
 }
 
-void SlideView::slideListUpdate(QStringList const&tagList, QStringList const&slideList) {
+void SlideView::slideListUpdate(QStringList tagList, QStringList const&slideList) {
+	for (auto &tag : tagList) {
+		tag = tag.split("").join("\n");
+	}
 	m_currentSlide = 0;
 	m_slideTable->setRowCount(static_cast<int>(slideList.size()));
 	for (int i = 0; i < slideList.size(); ++i) {

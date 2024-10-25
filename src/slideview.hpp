@@ -28,7 +28,7 @@ class SlideView: public QWidget {
 
 		void songListUpdate(QStringList const&songList);
 
-		void slideListUpdate(QStringList const&tagList, QStringList const&songList);
+		void slideListUpdate(QStringList tagList, QStringList const&songList);
 
 		void reset();
 

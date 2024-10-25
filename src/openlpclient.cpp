@@ -190,12 +190,12 @@ void OpenLPClient::handleSlideListResponse(QNetworkReply *reply) {
 	QStringList tagList;
 	auto doc = QJsonDocument::fromJson(data);
 	auto items = doc.object()["results"].toObject()["slides"].toArray();
-	for (auto const &item : items) {
-		auto slide = item.toObject();
+	for (auto const&item : items) {
+		auto const slide = item.toObject();
 		auto text = slide["text"].toString();
 		auto tag = slide["tag"].toString();
-		slideList.push_back(text);
-		tagList.push_back(tag);
+		slideList.push_back(std::move(text));
+		tagList.push_back(std::move(tag));
 	}
 	emit slideListUpdate(tagList, slideList);
 }
