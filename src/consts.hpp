@@ -10,5 +10,5 @@
 
 constexpr auto MaxCameraPresets = 9;
 constexpr auto MaxViews = 9;
-constexpr auto Version = "1.0-beta4";
+constexpr auto Version = "1.0-beta5";
 
