@@ -17,7 +17,6 @@ int main(int argc, char *argv[]) {
 	a.setStyle("fusion");
 	QApplication::setOrganizationName("DrinkingTea");
 	QApplication::setApplicationName("Slide Controller 9000");
-	qDebug() << QSettings().fileName();
 	MainWindow w;
 	w.show();
 	return QApplication::exec();
