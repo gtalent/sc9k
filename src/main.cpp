@@ -14,7 +14,9 @@
 int main(int argc, char *argv[]) {
 	QSettings::setDefaultFormat(QSettings::Format::IniFormat);
 	QApplication a(argc, argv);
+#ifndef __APPLE__
 	a.setStyle("fusion");
+#endif
 	QApplication::setOrganizationName("DrinkingTea");
 	QApplication::setApplicationName("Slide Controller 9000");
 	MainWindow w;
