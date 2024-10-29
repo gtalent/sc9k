@@ -14,6 +14,7 @@
 int main(int argc, char *argv[]) {
 	QSettings::setDefaultFormat(QSettings::Format::IniFormat);
 	QApplication a(argc, argv);
+	a.setStyle("fusion");
 	QApplication::setApplicationName(QObject::tr("Slide Controller 9000"));
 	MainWindow w;
 	w.show();
