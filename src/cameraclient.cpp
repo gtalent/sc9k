@@ -8,8 +8,8 @@
 
 #include <QNetworkReply>
 #include <QSettings>
-#include <string_view>
 
+#include "consts.hpp"
 #include "settingsdata.hpp"
 #include "cameraclient.hpp"
 
@@ -43,6 +43,16 @@ void CameraClient::setPreset(int preset) {
 	}
 }
 
+void CameraClient::reboot() {
+	post("/cgi-bin/param.cgi?post_reboot");
+	emit pollFailed();
+}
+
+void CameraClient::setBaseUrl() {
+	auto const [host, port] = getCameraConnectionData();
+	m_baseUrl = QString("http://%1:%2").arg(host, QString::number(port));
+}
+
 void CameraClient::setBrightness(int val) {
 	if (val > -1) {
 		get(QString("/cgi-bin/ptzctrl.cgi?post_image_value&bright&%1").arg(val));
@@ -73,33 +83,22 @@ void CameraClient::setHue(int val) {
 	}
 }
 
-void CameraClient::reboot() {
-	post("/cgi-bin/param.cgi?post_reboot");
-	emit pollFailed();
-}
-
-void CameraClient::setBaseUrl() {
-	auto const [host, port] = getCameraConnectionData();
-	m_baseUrl = QString("http://%1:%2").arg(host, QString::number(port));
-}
-
 void CameraClient::get(QString const&urlExt) {
-	QUrl url(QString(m_baseUrl) + urlExt);
-	QNetworkRequest rqst(url);
+	QUrl const url{QString{m_baseUrl} + urlExt};
+	QNetworkRequest rqst{url};
 	auto const reply = m_nam->get(rqst);
 	connect(reply, &QIODevice::readyRead, reply, &QObject::deleteLater);
 }
 
 void CameraClient::post(QString const&urlExt) {
-	QUrl url(QString(m_baseUrl) + urlExt);
-	QNetworkRequest rqst(url);
+	QNetworkRequest const rqst{QUrl{QString{m_baseUrl} + urlExt}};
 	auto const reply = m_nam->post(rqst, QByteArray{});
 	connect(reply, &QIODevice::readyRead, reply, &QObject::deleteLater);
 }
 
 void CameraClient::poll() {
-	QUrl url(QString(m_baseUrl) + "/cgi-bin/param.cgi?get_device_conf");
-	QNetworkRequest rqst(url);
+	QUrl const url{QString{m_baseUrl} + "/cgi-bin/param.cgi?get_device_conf"};
+	QNetworkRequest const rqst{url};
 	m_pollingNam->get(rqst);
 }
 

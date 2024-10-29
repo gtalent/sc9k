@@ -12,8 +12,6 @@
 #include <QObject>
 #include <QTimer>
 
-#include "consts.hpp"
-
 class CameraClient: public QObject {
 	Q_OBJECT
 	private:
@@ -29,6 +27,12 @@ class CameraClient: public QObject {
 
 		void setPreset(int preset);
 
+		void reboot();
+
+	public slots:
+		void setBaseUrl();
+
+	private:
 		void setBrightness(int val);
 
 		void setSaturation(int val);
@@ -39,12 +43,6 @@ class CameraClient: public QObject {
 
 		void setHue(int val);
 
-		void reboot();
-
-	public slots:
-		void setBaseUrl();
-
-	private:
 		void get(QString const&url);
 
 		void post(QString const&url);
