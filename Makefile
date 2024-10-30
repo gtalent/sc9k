@@ -4,14 +4,14 @@ VCPKG_PKGS=
 include ${BUILDCORE_PATH}/base.mk
 
 ifeq ($(OS),darwin)
-	PROJECT_EXECUTABLE=./dist/${CURRENT_BUILD}/${PROJECT_NAME}.app/Contents/MacOS/SlideController
+	PROJECT_EXECUTABLE=./build/${BC_VAR_CURRENT_BUILD}/${PROJECT_NAME}.app/Contents/MacOS/SlideController
 else
-	PROJECT_EXECUTABLE=./dist/${CURRENT_BUILD}/bin/SlideController
+	PROJECT_EXECUTABLE=./build/${BC_VAR_CURRENT_BUILD}/bin/SlideController
 endif
 
 .PHONY: run
-run: install
+run:
 	${ENV_RUN} ${PROJECT_EXECUTABLE}
 .PHONY: debug
-debug: install
+debug:
 	${DEBUGGER} ${PROJECT_EXECUTABLE}
