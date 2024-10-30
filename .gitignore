@@ -2,6 +2,7 @@
 .clangd
 .conanbuild
 .current_build
+.idea
 __pycache__
 CMakeLists.txt.user
 Session.vim
