@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 
 #
-#  Copyright 2016 - 2023 gary@drinkingtea.net
+#  Copyright 2016 - 2021 gary@drinkingtea.net
 #
 #  This Source Code Form is subject to the terms of the Mozilla Public
 #  License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -15,20 +15,35 @@ import shutil
 import subprocess
 import sys
 
-from pybb import mkdir, rm
+import util
 
-os_name = os.uname().sysname.lower()
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument('--target', help='Platform target',
-                        default='{:s}-{:s}'.format(os_name, platform.machine()))
-    parser.add_argument('--build_type', help='Build type (asan,debug,release)', default='release')
-    parser.add_argument('--build_tool', help='Build tool (default,xcode)', default='')
-    parser.add_argument('--build_root', help='Path to the root of build directories (must be in project dir)', default='build')
-    parser.add_argument('--toolchain', help='Path to CMake toolchain file', default='')
-    parser.add_argument('--current_build', help='Indicates whether or not to make this the active build', default=1)
-    parser.add_argument('--use_conan', help='Indicates whether or not should use .conanbuild/conan_toolchain.cmake', default='0')
+    parser.add_argument(
+            '--target',
+            help='Platform target',
+            default=f'{util.get_os()}-{util.get_arch()}')
+    parser.add_argument(
+            '--build_type',
+            help='Build type (asan,debug,release)',
+            default='release')
+    parser.add_argument(
+            '--build_tool',
+            help='Build tool (default,xcode)',
+            default='')
+    parser.add_argument(
+            '--build_root',
+            help='Path to the root build directory (must be in project dir)',
+            default='build')
+    parser.add_argument(
+            '--toolchain',
+            help='Path to CMake toolchain file',
+            default='')
+    parser.add_argument(
+            '--current_build',
+            help='Indicates whether or not to make this the active build',
+            default=1)
     args = parser.parse_args()
 
     if args.build_type == 'asan':
@@ -66,10 +81,10 @@ def main() -> int:
         return 1
 
     project_dir = os.getcwd()
-    build_dir = '{:s}/{:s}/{:s}'.format(project_dir, args.build_root, build_config)
-    rm(build_dir)
+    build_dir = f'{project_dir}/{args.build_root}/{build_config}'
+    util.rm(build_dir)
     cmake_cmd = [
-        'cmake', '-S', project_dir, '-B', build_dir, build_tool,
+        'cmake', '-S', project_dir, '-B', build_dir,
         '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',
         '-DCMAKE_TOOLCHAIN_FILE={:s}'.format(args.toolchain),
         '-DCMAKE_BUILD_TYPE={:s}'.format(build_type_arg),
@@ -77,24 +92,27 @@ def main() -> int:
         '-DBUILDCORE_BUILD_CONFIG={:s}'.format(build_config),
         '-DBUILDCORE_TARGET={:s}'.format(args.target),
     ]
-    if args.use_conan != '0':
-        cmake_cmd.append('-DCMAKE_TOOLCHAIN_FILE={:s}'.format('.conanbuild/conan_toolchain.cmake'))
+    if build_tool != '':
+        cmake_cmd.append(build_tool)
     if qt_path != '':
         cmake_cmd.append(qt_path)
-    if platform.system() == 'Windows':
+    if platform.system() == 'Windows' and platform.system() == 'AMD64':
         cmake_cmd.append('-A x64')
 
-    subprocess.run(cmake_cmd)
+    cmake_err = subprocess.run(cmake_cmd).returncode
+    if cmake_err != 0:
+        return cmake_err
 
-    mkdir('dist')
+    util.mkdir_p('dist')
     if int(args.current_build) != 0:
         cb = open('.current_build', 'w')
         cb.write(args.build_type)
         cb.close()
 
-    rm('compile_commands.json')
+    util.rm('compile_commands.json')
     if platform.system() != 'Windows':
-        os.symlink('{:s}/compile_commands.json'.format(build_dir), 'compile_commands.json')
+        os.symlink(f'{build_dir}/compile_commands.json',
+                   'compile_commands.json')
     return 0
 
 

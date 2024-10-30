@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 
 #
-#  Copyright 2016 - 2023 gary@drinkingtea.net
+#  Copyright 2016 - 2021 gary@drinkingtea.net
 #
 #  This Source Code Form is subject to the terms of the Mozilla Public
 #  License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -18,18 +18,20 @@ import subprocess
 import sys
 from typing import List, Optional
 
-
-def mkdir(path: str):
-    if not os.path.exists(path):
-        os.mkdir(path)
+import util
 
 
-# this exists because Windows is utterly incapable of providing a proper rm -rf
-def rm(path: str):
-    if (os.path.exists(path) or os.path.islink(path)) and not os.path.isdir(path):
-        os.remove(path)
-    elif os.path.isdir(path):
-        shutil.rmtree(path)
+def mkdir(path: str) -> int:
+    try:
+        util.mkdir_p(path)
+    except Exception:
+        return 1
+    return 0
+
+
+def rm_multi(paths: List[str]):
+    for path in paths:
+        util.rm(path)
 
 
 def ctest_all() -> int:
@@ -70,16 +72,13 @@ def conan() -> int:
     err = 0
     try:
         mkdir(conan_dir)
-    except:
+    except Exception:
         return 1
     if err != 0:
         return err
-    args = ['conan', 'install', '../', '-of', '.', '--build=missing', '-pr', project_name]
+    args = ['conan', 'install', '../', '--build=missing', '-pr', project_name]
     os.chdir(conan_dir)
-    err = subprocess.run(args).returncode
-    if err != 0:
-        return err
-    return 0
+    return subprocess.run(args).returncode
 
 
 def cat(paths: List[str]) -> int:
@@ -87,48 +86,70 @@ def cat(paths: List[str]) -> int:
         try:
             with open(path) as f:
                 data = f.read()
-                sys.stdout.write(data)
+                print(data)
         except FileNotFoundError:
-            sys.stderr.write('cat: {}: no such file or directory\n'.format(path))
+            sys.stderr.write(f'cat: {path}: no such file or directory\n')
             return 1
-    sys.stdout.write('\n')
     return 0
+
+
+def debug(paths: List[str]) -> int:
+    if shutil.which('gdb') is not None:
+        args = ['gdb', '--args']
+    elif shutil.which('lldb') is not None:
+        args = ['lldb', '--']
+    else:
+        sys.stderr.write('debug: could not find a supported debugger\n')
+        return 1
+    args.extend(paths)
+    return subprocess.run(args).returncode
 
 
 def get_env(var_name: str) -> int:
     if var_name not in os.environ:
         return 1
-    sys.stdout.write(os.environ[var_name])
+    print(os.environ[var_name])
     return 0
 
 
 def hostname() -> int:
-    sys.stdout.write(platform.node())
+    print(platform.node())
     return 0
+
+
+def host_env() -> int:
+    os_name = platform.system().lower()
+    arch = util.get_arch()
+    print(f'{os_name}-{arch}')
+    return 0
+
+
+def clarg(idx: int) -> Optional[str]:
+    return sys.argv[idx] if len(sys.argv) > idx else None
 
 
 def main() -> int:
     err = 0
     if sys.argv[1] == 'mkdir':
-        try:
-            mkdir(sys.argv[2])
-        except:
-            err = 1
+        err = mkdir(sys.argv[2])
     elif sys.argv[1] == 'rm':
-        for i in range(2, len(sys.argv)):
-            rm(sys.argv[i])
+        rm_multi(sys.argv[2:])
     elif sys.argv[1] == 'conan-install':
         err = conan()
     elif sys.argv[1] == 'ctest-all':
         err = ctest_all()
     elif sys.argv[1] == 'cmake-build':
-        err = cmake_build(sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else None)
+        err = cmake_build(sys.argv[2], clarg(3))
     elif sys.argv[1] == 'cat':
         err = cat(sys.argv[2:])
+    elif sys.argv[1] == 'debug':
+        err = debug(sys.argv[2:])
     elif sys.argv[1] == 'getenv':
         err = get_env(sys.argv[2])
     elif sys.argv[1] == 'hostname':
         err = hostname()
+    elif sys.argv[1] == 'hostenv':
+        err = host_env()
     else:
         sys.stderr.write('Command not found\n')
         err = 1
