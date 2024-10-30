@@ -8,8 +8,6 @@
 
 #pragma once
 
-#include <cstdint>
-
 #include <QMainWindow>
 
 #include "cameraclient.hpp"
