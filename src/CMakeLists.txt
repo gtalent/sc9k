@@ -16,6 +16,7 @@ add_executable(
 		settingsdata.cpp
 		settingsdialog.cpp
 		slideview.cpp
+		sc9k.rc
 )
 
 target_link_libraries(
