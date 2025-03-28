@@ -201,8 +201,8 @@ void MainWindow::setupViewControls(QVBoxLayout *rootLyt) {
 		});
 		views.emplace_back(View{
 			.name = tr("Show"),
-			.slides = false,
-			.obsSlides = false,
+			.slides = true,
+			.obsSlides = true,
 		});
 	}
 	setupViewControlButtons(views, viewCtlLyt);
