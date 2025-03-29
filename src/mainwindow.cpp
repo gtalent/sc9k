@@ -144,7 +144,7 @@ void MainWindow::setupMenu() {
 R"(Slide Controller 9000 - %1
 Build date: %2
 
-Copyright 2021 - 2024 Gary Talent (gary@drinkingtea.net)
+Copyright 2021 - 2025 Gary Talent (gary@drinkingtea.net)
 Slide Controller 9000 is released under the MPL 2.0
 Built on Qt library under LGPL 2.0)").arg(Version, __DATE__));
 			about.exec();
