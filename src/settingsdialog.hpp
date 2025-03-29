@@ -38,7 +38,8 @@ class SettingsDialog: public QDialog {
 		QWidget *setupViewConfig(QWidget *parent);
 		QWidget *setupImageConfig(QWidget *parent);
 		QWidget *setupButtons(QWidget *parent);
-		void handleApply();
+        [[nodiscard]]
+        int handleApply();
 		void handleOK();
 		void setupViewRow(int row, View const&view = {});
 		/**

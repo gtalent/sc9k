@@ -205,12 +205,12 @@ QWidget *SettingsDialog::setupButtons(QWidget *parent) {
 	return root;
 }
 
-void SettingsDialog::handleApply() {
+int SettingsDialog::handleApply() {
 	QSettings settings;
 	QVector<View> views;
 	auto const viewsErr = collectViews(views);
 	if (viewsErr) {
-		return;
+        return -1;
 	}
 	setViews(settings, views);
 	setCameraConnectionData(settings, {
@@ -227,11 +227,13 @@ void SettingsDialog::handleApply() {
 	});
 	collectVideoConfig();
 	setVideoConfig(settings, m_videoConfig);
+    return 0;
 }
 
 void SettingsDialog::handleOK() {
-	handleApply();
-	accept();
+    if (handleApply() == 0) {
+        accept();
+    }
 }
 
 void SettingsDialog::setupViewRow(int row, View const&view) {
