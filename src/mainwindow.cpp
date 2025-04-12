@@ -121,18 +121,6 @@ void MainWindow::setupMenu() {
 			});
 			menu->addAction(cameraPresetAct);
 		}
-		menu->addSeparator();
-		auto const rebootAct = new QAction(tr("&Reboot"), this);
-		connect(rebootAct, &QAction::triggered, &m_cameraClient, [this] {
-			QMessageBox confirm(this);
-			confirm.setText(tr("Are you sure you want to reboot the camera? This will take about 20 seconds."));
-			confirm.addButton(tr("&No"), QMessageBox::ButtonRole::NoRole);
-			confirm.addButton(tr("&Yes"), QMessageBox::ButtonRole::YesRole);
-			if (confirm.exec()) {
-				m_cameraClient.reboot();
-			}
-		});
-		menu->addAction(rebootAct);
 	}
 	// help menu
 	{
