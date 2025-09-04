@@ -11,3 +11,8 @@ cp -r $dist_dir/share/ /usr/
 if command -v gtk-update-icon-cache >/dev/null 2>&1; then
 	sudo gtk-update-icon-cache /usr/share/icons/hicolor
 fi
+
+if command -v apt-get >/dev/null 2>&1; then
+    sudo apt-get update
+    sudo apt-get install -y qt6-gtk-platformtheme qgnomeplatform-qt6 adwaita-qt
+fi
