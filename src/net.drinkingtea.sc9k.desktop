@@ -10,5 +10,5 @@ X-MultipleArgs=false
 Icon=net.drinkingtea.sc9k
 Categories=Multimedia
 Keywords=slide;controller;sc9k
-StartupWMClass=Slide Controller 9000
-StartupNotify=false
+StartupWMClass=SlideController
+StartupNotify=true
