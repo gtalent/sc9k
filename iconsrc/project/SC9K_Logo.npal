@@ -1,0 +1,27 @@
+K1;3d1a77ec-265f-4905-2061-4f1003ee2189;O1;net.drinkingtea.nostalgia.core.Palette;4;{
+	"colorNames" : 
+	[
+		"Color 1",
+		"Color 2",
+		"Color 3"
+	],
+	"pages" : 
+	[
+		{
+			"colors" : 
+			[
+				{
+					"b" : 10,
+					"g" : 5,
+					"r" : 5
+				},
+				{},
+				{
+					"b" : 31,
+					"g" : 31,
+					"r" : 31
+				}
+			]
+		}
+	]
+}

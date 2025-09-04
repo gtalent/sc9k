@@ -17,6 +17,8 @@
 class OBSClient: public QObject {
 	Q_OBJECT
 	private:
+		static constexpr auto SceneSlides = "MusicScene";
+		static constexpr auto SceneNoSlides = "SpeakerScene";
 		QString m_baseUrl;
 		QNetworkAccessManager *m_nam = new QNetworkAccessManager(this);
 		QNetworkAccessManager *m_pollingNam = new QNetworkAccessManager(this);

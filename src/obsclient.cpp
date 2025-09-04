@@ -26,18 +26,18 @@ void OBSClient::setScene(QString const&scene) {
 }
 
 void OBSClient::showSlides() {
-	setScene("MusicScene");
+	setScene(SceneSlides);
 }
 
 void OBSClient::hideSlides() {
-	setScene("SpeakerScene");
+	setScene(SceneNoSlides);
 }
 
 void OBSClient::setSlidesVisible(bool state) {
 	if (state) {
-		setScene("MusicScene");
+		setScene(SceneSlides);
 	} else {
-		setScene("SpeakerScene");
+		setScene(SceneNoSlides);
 	}
 }
 

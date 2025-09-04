@@ -33,3 +33,17 @@ install(
 	BUNDLE DESTINATION .
 )
 
+install(
+	DIRECTORY
+		icons
+	DESTINATION
+		share
+)
+
+install(
+	FILES
+		net.drinkingtea.sc9k.desktop
+	DESTINATION
+		share/applications
+)
+

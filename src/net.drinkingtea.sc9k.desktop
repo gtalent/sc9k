@@ -1,0 +1,14 @@
+[Desktop Entry]
+Name=Slide Controller 9000
+Comment=Slide and Live Stream Coordinator
+GenericName=Slide and Live Stream Coordinator
+X-GNOME-FullName=Slide Controller 9000
+Type=Application
+Exec=/usr/local/bin/SlideController
+Terminal=false
+X-MultipleArgs=false
+Icon=net.drinkingtea.sc9k
+Categories=Multimedia
+Keywords=slide;controller;sc9k
+StartupWMClass=Slide Controller 9000
+StartupNotify=false
