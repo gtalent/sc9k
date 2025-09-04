@@ -25,3 +25,11 @@ endif()
 set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 
 add_subdirectory(src)
+
+install(
+	PROGRAMS
+		install.sh
+	DESTINATION
+		.
+)
+

@@ -47,3 +47,16 @@ install(
 		share/applications
 )
 
+if(UNIX)
+	qt_add_resources(
+		SlideController "app_images"
+			PREFIX "/"
+			FILES
+				icons/hicolor/16x16/apps/net.drinkingtea.sc9k.png
+				icons/hicolor/32x32/apps/net.drinkingtea.sc9k.png
+				icons/hicolor/64x64/apps/net.drinkingtea.sc9k.png
+				icons/hicolor/128x128/apps/net.drinkingtea.sc9k.png
+				icons/hicolor/256x256/apps/net.drinkingtea.sc9k.png
+				icons/hicolor/512x512/apps/net.drinkingtea.sc9k.png
+	)
+endif()

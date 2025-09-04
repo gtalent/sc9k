@@ -19,6 +19,16 @@ int main(int argc, char *argv[]) {
 	QApplication a(argc, argv);
 	QApplication::setOrganizationName("DrinkingTea");
 	QApplication::setApplicationName("Slide Controller 9000");
+#ifdef __linux
+	QIcon icon;
+	icon.addFile(":/icons/hicolor/16x16/apps/net.drinkingtea.sc9k.png");
+	icon.addFile(":/icons/hicolor/32x32/apps/net.drinkingtea.sc9k.png");
+	icon.addFile(":/icons/hicolor/64x64/apps/net.drinkingtea.sc9k.png");
+	icon.addFile(":/icons/hicolor/128x128/apps/net.drinkingtea.sc9k.png");
+	icon.addFile(":/icons/hicolor/256x256/apps/net.drinkingtea.sc9k.png");
+	icon.addFile(":/icons/hicolor/512x512/apps/net.drinkingtea.sc9k.png");
+	QApplication::setWindowIcon(icon);
+#endif
 	MainWindow w;
 	w.show();
 	return QApplication::exec();
