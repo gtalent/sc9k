@@ -13,7 +13,7 @@
 
 int main(int argc, char *argv[]) {
 	QSettings::setDefaultFormat(QSettings::Format::IniFormat);
-#ifndef __APPLE__
+#ifdef _WIN32
 	QApplication::setStyle("Fusion");
 #endif
 	QApplication a(argc, argv);

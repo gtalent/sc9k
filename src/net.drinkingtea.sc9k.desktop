@@ -4,7 +4,7 @@ Comment=Slide and Live Stream Coordinator
 GenericName=Slide and Live Stream Coordinator
 X-GNOME-FullName=Slide Controller 9000
 Type=Application
-Exec=env QT_QPA_PLATFORMTHEME=gnome /usr/local/bin/SlideController
+Exec=/usr/local/bin/SlideController
 Terminal=false
 X-MultipleArgs=false
 Icon=net.drinkingtea.sc9k
