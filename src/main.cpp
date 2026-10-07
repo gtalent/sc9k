@@ -19,6 +19,7 @@ int main(int argc, char *argv[]) {
 	QApplication a(argc, argv);
 	QApplication::setOrganizationName("DrinkingTea");
 	QApplication::setApplicationName("Slide Controller 9000");
+	QGuiApplication::setDesktopFileName("net.drinkingtea.sc9k");
 #ifdef __linux
 	QIcon icon;
 	icon.addFile(":/icons/hicolor/16x16/apps/net.drinkingtea.sc9k.png");
