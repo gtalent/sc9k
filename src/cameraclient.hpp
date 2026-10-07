@@ -8,11 +8,21 @@
 
 #pragma once
 
-#include <QByteArray>
+#include <algorithm>
+#include <array>
+#include <cstdint>
+#include <span>
 #include <QObject>
 #include <QString>
 #include <QTimer>
 #include <QUdpSocket>
+
+constexpr size_t MaxMsgSz = 32;
+
+struct ViscaMsg {
+	std::array<uint8_t, MaxMsgSz> data{};
+	size_t size{};
+};
 
 class CameraClient: public QObject {
 	Q_OBJECT
@@ -48,10 +58,10 @@ class CameraClient: public QObject {
 
 		void setHue(int val);
 
-		void sendVisca(QByteArray const&viscaMsg, bool isInquiry = false);
+		void sendVisca(std::span<uint8_t const> viscaMsg, bool isInquiry = false);
 
 		[[nodiscard]]
-		QByteArray createViscaPacket(QByteArray const&viscaMsg, bool isInquiry = false);
+		ViscaMsg createViscaPacket(std::span<uint8_t const> viscaMsg, bool isInquiry = false);
 
 		void poll();
 
