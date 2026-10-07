@@ -18,7 +18,6 @@ CameraClient::CameraClient(QObject *parent): QObject(parent), m_socket(new QUdpS
 	m_socket->bind(QHostAddress::AnyIPv4, 0);
 	connect(m_socket, &QUdpSocket::readyRead, this, &CameraClient::onReadyRead);
 	connect(m_socket, &QUdpSocket::errorOccurred, this, &CameraClient::onSocketError);
-
 	setBaseUrl();
 	poll();
 	m_pollTimer.start(1000);
@@ -34,7 +33,6 @@ void CameraClient::setPresetVC(int const preset, VideoConfig const&vc) {
 			0xFF
 		};
 		sendVisca(cmd);
-
 		setBrightness(vc.brightness);
 		setSaturation(vc.saturation);
 		setContrast(vc.contrast);
@@ -52,7 +50,6 @@ void CameraClient::setPreset(int const preset) {
 			0xFF
 		};
 		sendVisca(cmd);
-
 		auto const vcList = getVideoConfig();
 		if (preset - 1 < vcList.size()) {
 			auto const vc = vcList[preset - 1];
@@ -69,7 +66,6 @@ void CameraClient::reboot() {
 	// VISCA Power Off / Standby: 81 01 04 00 03 FF
 	constexpr std::array<uint8_t, 6> cmd{0x81, 0x01, 0x04, 0x00, 0x03, 0xFF};
 	sendVisca(cmd);
-
 	m_connected = false;
 	m_missedPolls = 3;
 	emit pollFailed();
@@ -213,11 +209,9 @@ void CameraClient::onReadyRead() {
 		QHostAddress sender;
 		quint16 senderPort = 0;
 		m_socket->readDatagram(datagram.data(), datagram.size(), &sender, &senderPort);
-
 		if (datagram.isEmpty()) {
 			continue;
 		}
-
 		m_missedPolls = 0;
 		if (!m_connected) {
 			m_connected = true;
