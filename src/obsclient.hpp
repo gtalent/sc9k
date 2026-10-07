@@ -8,47 +8,65 @@
 
 #pragma once
 
-#include <QNetworkAccessManager>
+#include <QByteArray>
 #include <QObject>
+#include <QString>
+#include <QTcpSocket>
 #include <QTimer>
-
-#include "consts.hpp"
 
 class OBSClient: public QObject {
 	Q_OBJECT
 	private:
+		enum class State {
+			Disconnected,
+			Connecting,
+			Handshaking,
+			Identifying,
+			Connected
+		};
+
 		static constexpr auto SceneSlides = "SlidesScene";
 		static constexpr auto SceneNoSlides = "NoSlidesScene";
-		QString m_baseUrl;
-		QNetworkAccessManager *m_nam = new QNetworkAccessManager(this);
-		QNetworkAccessManager *m_pollingNam = new QNetworkAccessManager(this);
+
+		QString m_host;
+		uint16_t m_port = 4455;
+		QString m_password;
+
+		QTcpSocket *m_socket = nullptr;
 		QTimer m_pollTimer;
+		State m_state = State::Disconnected;
+		QByteArray m_readBuffer;
+		QByteArray m_secWebSocketKey;
+		quint64 m_requestId = 0;
 
 	public:
 		explicit OBSClient(QObject *parent = nullptr);
 
 	public slots:
-		void setScene(QString const&scene);
-
+		void setScene(QString const &scene);
 		void showSlides();
-
 		void hideSlides();
-
 		void setSlidesVisible(bool state);
-
 		void setBaseUrl();
 
-	private:
-		void get(QString const&url);
-
+	private slots:
+		void onConnected();
+		void onDisconnected();
+		void onReadyRead();
+		void onErrorOccurred(QAbstractSocket::SocketError socketError);
 		void poll();
 
-		void handlePollResponse(QNetworkReply *reply);
+	private:
+		void connectToHost();
+		void sendHandshake();
+		void processHandshake();
+		void processFrames();
+		void handleMessage(QString const &message);
+		void sendTextFrame(QString const &text);
+		void sendPong(QByteArray const &payload);
 
 	signals:
 		void pollUpdate();
-
 		void pollFailed();
-
 };
 

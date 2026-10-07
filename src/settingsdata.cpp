@@ -11,10 +11,10 @@
 #include "consts.hpp"
 #include "settingsdata.hpp"
 
-void setVideoConfig(QSettings &settings, QVector<VideoConfig> const&vcList) {
+void setVideoConfig(QSettings &settings, QVector<VideoConfig> const &vcList) {
 	settings.beginGroup("Camera");
 	settings.beginWriteArray("VideoImageConfig");
-	for (auto i = 0; auto const&vc : vcList) {
+	for (auto i = 0; auto const &vc : vcList) {
 		settings.setArrayIndex(i);
 		settings.setValue("brightness", vc.brightness);
 		settings.setValue("saturation", vc.saturation);
@@ -27,7 +27,7 @@ void setVideoConfig(QSettings &settings, QVector<VideoConfig> const&vcList) {
 	settings.endGroup();
 }
 
-void setVideoConfig(QVector<VideoConfig> const&vcList) {
+void setVideoConfig(QVector<VideoConfig> const &vcList) {
 	QSettings s;
 	setVideoConfig(s, vcList);
 }
@@ -56,24 +56,25 @@ QVector<VideoConfig> getVideoConfig() {
 	return getVideoConfig(s);
 }
 
-void setCameraConnectionData(QSettings &settings, ConnectionData const&cd) {
+void setCameraConnectionData(QSettings &settings, ConnectionData const &cd) {
 	settings.beginGroup("CameraClient");
 	settings.setValue("Host", cd.host);
 	settings.setValue("Port", cd.port);
 	settings.endGroup();
 }
 
-void setOpenLPConnectionData(QSettings &settings, ConnectionData const&cd) {
+void setOpenLPConnectionData(QSettings &settings, ConnectionData const &cd) {
 	settings.beginGroup("OpenLPClient");
 	settings.setValue("Host", cd.host);
 	settings.setValue("Port", cd.port);
 	settings.endGroup();
 }
 
-void setOBSConnectionData(QSettings &settings, ConnectionData const&cd) {
+void setOBSConnectionData(QSettings &settings, OBSConnectionData const &cd) {
 	settings.beginGroup("OBSClient");
 	settings.setValue("Host", cd.host);
 	settings.setValue("Port", cd.port);
+	settings.setValue("Password", cd.password);
 	settings.endGroup();
 }
 
@@ -95,16 +96,17 @@ ConnectionData getOpenLPConnectionData(QSettings &settings) {
 	return out;
 }
 
-ConnectionData getOBSConnectionData(QSettings &settings) {
-	ConnectionData out;
+OBSConnectionData getOBSConnectionData(QSettings &settings) {
+	OBSConnectionData out;
 	settings.beginGroup("OBSClient");
 	out.host = settings.value("Host", "127.0.0.1").toString();
-	out.port = static_cast<uint16_t>(settings.value("Port", 9302).toInt());
+	out.port = static_cast<uint16_t>(settings.value("Port", 4455).toInt());
+	out.password = settings.value("Password", "").toString();
 	settings.endGroup();
 	return out;
 }
 
-void setCameraConnectionData(ConnectionData const&cd) {
+void setCameraConnectionData(ConnectionData const &cd) {
 	QSettings settings;
 	settings.beginGroup("CameraClient");
 	settings.setValue("Host", cd.host);
@@ -112,7 +114,7 @@ void setCameraConnectionData(ConnectionData const&cd) {
 	settings.endGroup();
 }
 
-void setOpenLPConnectionData(ConnectionData const&cd) {
+void setOpenLPConnectionData(ConnectionData const &cd) {
 	QSettings settings;
 	settings.beginGroup("OpenLPClient");
 	settings.setValue("Host", cd.host);
@@ -120,11 +122,12 @@ void setOpenLPConnectionData(ConnectionData const&cd) {
 	settings.endGroup();
 }
 
-void setOBSConnectionData(ConnectionData const&cd) {
+void setOBSConnectionData(OBSConnectionData const &cd) {
 	QSettings settings;
 	settings.beginGroup("OBSClient");
 	settings.setValue("Host", cd.host);
 	settings.setValue("Port", cd.port);
+	settings.setValue("Password", cd.password);
 	settings.endGroup();
 }
 
@@ -138,16 +141,16 @@ ConnectionData getOpenLPConnectionData() {
 	return getOpenLPConnectionData(s);
 }
 
-ConnectionData getOBSConnectionData() {
+OBSConnectionData getOBSConnectionData() {
 	QSettings s;
 	return getOBSConnectionData(s);
 }
 
 
-void setViews(QSettings &settings, QVector<View> const&views) {
+void setViews(QSettings &settings, QVector<View> const &views) {
 	settings.beginGroup("Views");
 	settings.beginWriteArray("Views");
-	for (auto i = 0; auto const&view : views) {
+	for (auto i = 0; auto const &view : views) {
 		settings.setArrayIndex(i);
 		settings.setValue("Name", view.name);
 		settings.setValue("Slides", view.slides);
@@ -159,7 +162,7 @@ void setViews(QSettings &settings, QVector<View> const&views) {
 	settings.endGroup();
 }
 
-void setViews(QVector<View> const&views) {
+void setViews(QVector<View> const &views) {
 	QSettings s;
 	return setViews(s, views);
 }

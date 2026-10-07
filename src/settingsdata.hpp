@@ -20,9 +20,9 @@ struct VideoConfig {
 	int hue = 7;
 };
 
-void setVideoConfig(class QSettings &settings, QVector<VideoConfig> const&vc);
+void setVideoConfig(class QSettings &settings, QVector<VideoConfig> const &vc);
 
-void setVideoConfig(QVector<VideoConfig> const&vc);
+void setVideoConfig(QVector<VideoConfig> const &vc);
 
 QVector<VideoConfig> getVideoConfig(class QSettings &settings);
 
@@ -33,11 +33,23 @@ struct ConnectionData {
 	uint16_t port = 0;
 };
 
-void setCameraConnectionData(class QSettings &settings, ConnectionData const&cd);
+struct OBSConnectionData {
+	QString host;
+	uint16_t port = 0;
+	QString password;
+};
 
-void setOpenLPConnectionData(class QSettings &settings, ConnectionData const&cd);
+void setCameraConnectionData(class QSettings &settings, ConnectionData const &cd);
 
-void setOBSConnectionData(class QSettings &settings, ConnectionData const&cd);
+void setOpenLPConnectionData(class QSettings &settings, ConnectionData const &cd);
+
+void setOBSConnectionData(class QSettings &settings, OBSConnectionData const &cd);
+
+void setCameraConnectionData(ConnectionData const &cd);
+
+void setOpenLPConnectionData(ConnectionData const &cd);
+
+void setOBSConnectionData(OBSConnectionData const &cd);
 
 [[nodiscard]]
 ConnectionData getCameraConnectionData(class QSettings &settings);
@@ -46,7 +58,7 @@ ConnectionData getCameraConnectionData(class QSettings &settings);
 ConnectionData getOpenLPConnectionData(class QSettings &settings);
 
 [[nodiscard]]
-ConnectionData getOBSConnectionData(class QSettings &settings);
+OBSConnectionData getOBSConnectionData(class QSettings &settings);
 
 [[nodiscard]]
 ConnectionData getCameraConnectionData();
@@ -55,7 +67,7 @@ ConnectionData getCameraConnectionData();
 ConnectionData getOpenLPConnectionData();
 
 [[nodiscard]]
-ConnectionData getOBSConnectionData();
+OBSConnectionData getOBSConnectionData();
 
 
 struct View {
@@ -65,9 +77,9 @@ struct View {
 	int cameraPreset = -1;
 };
 
-void setViews(class QSettings &settings, QVector<View> const&views);
+void setViews(class QSettings &settings, QVector<View> const &views);
 
-void setViews(QVector<View> const&views);
+void setViews(QVector<View> const &views);
 
 [[nodiscard]]
 QVector<View> getViews(class QSettings &settings);

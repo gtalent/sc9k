@@ -24,6 +24,7 @@ class SettingsDialog: public QDialog {
 		class QLineEdit *m_openLpPortLe = nullptr;
 		class QLineEdit *m_obsHostLe = nullptr;
 		class QLineEdit *m_obsPortLe = nullptr;
+		class QLineEdit *m_obsPasswordLe = nullptr;
 		class QSpinBox *m_vidBrightness = nullptr;
 		class QSpinBox *m_vidSaturation = nullptr;
 		class QSpinBox *m_vidContrast = nullptr;
@@ -41,7 +42,7 @@ class SettingsDialog: public QDialog {
         [[nodiscard]]
         int handleApply();
 		void handleOK();
-		void setupViewRow(int row, View const&view = {});
+		void setupViewRow(int row, View const &view = {});
 		/**
 		 * Gets views from table.
 		 * @return error code

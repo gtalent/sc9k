@@ -75,11 +75,15 @@ QWidget *SettingsDialog::setupNetworkInputs(QWidget *parent) {
 		auto const c = getOBSConnectionData(settings);
 		m_obsHostLe = new QLineEdit(root);
 		m_obsPortLe = new QLineEdit(root);
+		m_obsPasswordLe = new QLineEdit(root);
+		m_obsPasswordLe->setEchoMode(QLineEdit::Password);
 		m_obsHostLe->setText(c.host);
 		m_obsPortLe->setText(QString::number(c.port));
+		m_obsPasswordLe->setText(c.password);
 		m_obsPortLe->setValidator(portValidator);
 		lyt->addRow(tr("O&BS Host:"), m_obsHostLe);
 		lyt->addRow(tr("OB&S Port:"), m_obsPortLe);
+		lyt->addRow(tr("OBS &Password:"), m_obsPasswordLe);
 	}
 	return root;
 }
@@ -92,7 +96,7 @@ QWidget *SettingsDialog::setupImageConfig(QWidget *parent) {
 		auto const formLyt = new QFormLayout(formRoot);
 		lyt->addWidget(formRoot);
 		m_videoConfig = getVideoConfig();
-		auto const mkSb = [parent, formLyt](QString const&lbl) {
+		auto const mkSb = [parent, formLyt](QString const &lbl) {
 			auto const s = new QSpinBox(parent);
 			s->setAlignment(Qt::AlignRight);
 			s->setRange(0, 14);
@@ -179,7 +183,7 @@ QWidget *SettingsDialog::setupViewConfig(QWidget *parent) {
 		});
 		auto const views = getViews();
 		m_viewTable->setRowCount(static_cast<int>(views.size()));
-		for (auto row = 0; auto const&view : views) {
+		for (auto row = 0; auto const &view : views) {
 			setupViewRow(row, view);
 			++row;
 		}
@@ -224,6 +228,7 @@ int SettingsDialog::handleApply() {
 	setOBSConnectionData(settings, {
 		.host = m_obsHostLe->text(),
 		.port = m_obsPortLe->text().toUShort(),
+		.password = m_obsPasswordLe->text(),
 	});
 	collectVideoConfig();
 	setVideoConfig(settings, m_videoConfig);
@@ -236,7 +241,7 @@ void SettingsDialog::handleOK() {
     }
 }
 
-void SettingsDialog::setupViewRow(int row, View const&view) {
+void SettingsDialog::setupViewRow(int row, View const &view) {
 	// name
 	auto const nameItem = new QTableWidgetItem(view.name);
 	m_viewTable->setItem(row, ViewColumn::Name, nameItem);
@@ -298,7 +303,7 @@ void SettingsDialog::updateVidConfigPreset(int preset) {
 			dst->setValue(val);
 		}
 	};
-	auto const&vc = m_videoConfig[preset];
+	auto const &vc = m_videoConfig[preset];
 	setVal(vc.brightness, m_vidBrightness);
 	setVal(vc.saturation, m_vidSaturation);
 	setVal(vc.contrast, m_vidContrast);
