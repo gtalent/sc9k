@@ -74,9 +74,9 @@ class OpenLPClient: public QObject {
 		void setBaseUrl();
 
 	private:
-		void get(QString const&url);
+		void get(QString const &url);
 
-		void post(QString const&url, QString const&data);
+		void post(QString const &url, QString const &data);
 
 		void requestSongList();
 
@@ -90,11 +90,11 @@ class OpenLPClient: public QObject {
 
 		void processWebSocketFrames();
 
-		void handleWebSocketMessage(QString const&message);
+		void handleWebSocketMessage(QString const &message);
 
-		void sendWebSocketPong(QByteArray const&payload);
+		void sendWebSocketPong(QByteArray const &payload);
 
-		void handleStateJson(QJsonObject const&results);
+		void handleStateJson(QJsonObject const &results);
 
 	private slots:
 		void poll();

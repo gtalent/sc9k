@@ -42,23 +42,23 @@ QString SlideView::getNextSong() const {
 	return "";
 }
 
-void SlideView::pollUpdate(QString const&songName, int slide) {
-	auto const songItems = m_songSelector->findItems(songName, Qt::MatchFixedString);
+void SlideView::pollUpdate(QString const &songId, int const slideNum) {
+	auto const songItems = m_songSelector->findItems(songId, Qt::MatchFixedString);
 	if (songItems.empty()) {
 		return;
 	}
 	auto songItem = songItems.first();
 	if (songItem != m_songSelector->currentItem()) {
-		m_currentSong = songName;
+		m_currentSong = songId;
 		m_songSelector->setCurrentItem(songItem);
 	}
-	if (slide != m_currentSlide) {
-		m_currentSlide = slide;
-		m_slideTable->setCurrentCell(slide, 0);
+	if (slideNum != m_currentSlide) {
+		m_currentSlide = slideNum;
+		m_slideTable->setCurrentCell(slideNum, 0);
 	}
 }
 
-void SlideView::changeSong(int song) {
+void SlideView::changeSong(int const song) {
 	if (song < 0) {
 		return;
 	}
@@ -68,14 +68,14 @@ void SlideView::changeSong(int song) {
 	}
 }
 
-void SlideView::slideListUpdate(QStringList tagList, QStringList const&slideList) {
+void SlideView::slideListUpdate(QStringList tagList, QStringList const &slideList) {
 	for (auto &tag : tagList) {
 		tag = tag.split("").join("\n");
 	}
 	m_currentSlide = 0;
 	m_slideTable->setRowCount(static_cast<int>(slideList.size()));
 	for (int i = 0; i < slideList.size(); ++i) {
-		auto const& txt = slideList[i];
+		auto const &txt = slideList[i];
 		auto item = new QTableWidgetItem(txt);
 		item->setFlags(item->flags() & ~Qt::ItemIsEditable);
 		m_slideTable->setItem(i, 0, item);
@@ -91,7 +91,7 @@ void SlideView::reset() {
 	m_currentSlide = -1;
 }
 
-void SlideView::songListUpdate(QStringList const&songList) {
+void SlideView::songListUpdate(QStringList const &songList) {
 	// Is this replacing an existing song list or is it the initial song list?
 	// We want to reset the song to 0 upon replacement,
 	// but leave it alone upon initialization.

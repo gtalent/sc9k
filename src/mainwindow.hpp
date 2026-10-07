@@ -38,7 +38,7 @@ class MainWindow: public QMainWindow {
 	private:
 		void setupMenu();
 
-		void setupViewControlButtons(QVector<View> const&views, class QGridLayout *rootLyt);
+		void setupViewControlButtons(QVector<View> const &views, class QGridLayout *rootLyt);
 
 		void setupViewControls(class QVBoxLayout *rootLyt);
 

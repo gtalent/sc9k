@@ -70,7 +70,7 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent) {
 	connect(&m_openlpClient, &OpenLPClient::pollUpdate, this, &MainWindow::openLpConnectionInit);
 	connect(&m_obsClient, &OBSClient::pollUpdate, this, &MainWindow::obsConnectionInit);
 	refreshStatusBar();
-	connect(statusBar(), &QStatusBar::messageChanged, this, [this](QStringView const&msg) {
+	connect(statusBar(), &QStatusBar::messageChanged, this, [this](QStringView const &msg) {
 		if (msg.empty()) {
 			refreshStatusBar();
 		}
@@ -141,10 +141,10 @@ Built on Qt library under LGPL 2.0)").arg(Version, __DATE__));
 	}
 }
 
-void MainWindow::setupViewControlButtons(QVector<View> const&views, QGridLayout *viewCtlLyt) {
+void MainWindow::setupViewControlButtons(QVector<View> const &views, QGridLayout *viewCtlLyt) {
 	constexpr auto columns = 3;
 	auto const parent = viewCtlLyt->parentWidget();
-	for (auto i = 0; auto const&view : views) {
+	for (auto i = 0; auto const &view : views) {
 		auto const x = i % columns;
 		auto const y = i / columns;
 		auto const name = QString("%1. %2").arg(i + 1).arg(view.name);

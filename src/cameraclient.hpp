@@ -8,17 +8,22 @@
 
 #pragma once
 
-#include <QNetworkAccessManager>
+#include <QByteArray>
 #include <QObject>
+#include <QString>
 #include <QTimer>
+#include <QUdpSocket>
 
 class CameraClient: public QObject {
 	Q_OBJECT
 	private:
-		QString m_baseUrl;
-		QNetworkAccessManager *const m_nam = new QNetworkAccessManager(this);
-		QNetworkAccessManager *const m_pollingNam = new QNetworkAccessManager(this);
+		QString m_host;
+		uint16_t m_port = 52381;
+		QUdpSocket *const m_socket = nullptr;
 		QTimer m_pollTimer;
+		uint32_t m_sequenceNumber = 1;
+		int m_missedPolls = 0;
+		bool m_connected = false;
 
 	public:
 		explicit CameraClient(QObject *parent = nullptr);
@@ -43,13 +48,17 @@ class CameraClient: public QObject {
 
 		void setHue(int val);
 
-		void get(QString const&url);
+		void sendVisca(QByteArray const&viscaMsg, bool isInquiry = false);
 
-		void post(QString const&url);
+		[[nodiscard]]
+		QByteArray createViscaPacket(QByteArray const&viscaMsg, bool isInquiry = false);
 
 		void poll();
 
-		void handlePollResponse(QNetworkReply *reply);
+	private slots:
+		void onReadyRead();
+
+		void onSocketError(QAbstractSocket::SocketError socketError);
 
 	signals:
 		void pollUpdate();

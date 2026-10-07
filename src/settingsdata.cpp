@@ -82,7 +82,7 @@ ConnectionData getCameraConnectionData(QSettings &settings) {
 	ConnectionData out;
 	settings.beginGroup("CameraClient");
 	out.host = settings.value("Host", "192.168.100.88").toString();
-	out.port = static_cast<uint16_t>(settings.value("Port", 80).toInt());
+	out.port = static_cast<uint16_t>(settings.value("Port", 52381).toInt());
 	settings.endGroup();
 	return out;
 }

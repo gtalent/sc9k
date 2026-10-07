@@ -273,7 +273,7 @@ void OpenLPClient::processWebSocketFrames() {
 	}
 }
 
-void OpenLPClient::sendWebSocketPong(QByteArray const&payload) {
+void OpenLPClient::sendWebSocketPong(QByteArray const &payload) {
 	if (m_wsSocket->state() != QAbstractSocket::ConnectedState) {
 		return;
 	}
@@ -314,7 +314,7 @@ void OpenLPClient::sendWebSocketPong(QByteArray const&payload) {
 	m_wsSocket->write(frame);
 }
 
-void OpenLPClient::handleWebSocketMessage(QString const&message) {
+void OpenLPClient::handleWebSocketMessage(QString const &message) {
 	QJsonParseError err;
 	auto const doc = QJsonDocument::fromJson(message.toUtf8(), &err);
 	if (err.error != QJsonParseError::NoError || !doc.isObject()) {
@@ -323,7 +323,7 @@ void OpenLPClient::handleWebSocketMessage(QString const&message) {
 	handleStateJson(doc.object());
 }
 
-void OpenLPClient::handleStateJson(QJsonObject const&obj) {
+void OpenLPClient::handleStateJson(QJsonObject const &obj) {
 	QJsonObject results;
 	if (obj.contains("results")) {
 		results = obj["results"].toObject();
