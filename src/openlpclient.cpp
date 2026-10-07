@@ -61,7 +61,7 @@ void OpenLPClient::showSlides() {
 	get("/api/display/show");
 }
 
-void OpenLPClient::setSlidesVisible(bool value) {
+void OpenLPClient::setSlidesVisible(bool const value) {
 	if (value) {
 		showSlides();
 	} else {
@@ -69,13 +69,13 @@ void OpenLPClient::setSlidesVisible(bool value) {
 	}
 }
 
-void OpenLPClient::changeSong(int it) {
+void OpenLPClient::changeSong(int const it) {
 	auto n = QString::number(it);
 	auto url = "/api/service/set?data=%7B%22request%22%3A+%7B%22id%22%3A+" + n + "%7D%7D&_=1627181837297";
 	get(url);
 }
 
-void OpenLPClient::changeSlide(int slide) {
+void OpenLPClient::changeSlide(int const slide) {
 	auto n = QString::number(slide);
 	auto url = R"(/api/controller/live/set?data={"request"%3A+{"id"%3A)" + n + "}}&_=1626628079579)";
 	get(url);
@@ -86,13 +86,13 @@ void OpenLPClient::setBaseUrl() {
 	m_baseUrl = QString("http://%1:%2").arg(host, QString::number(port));
 }
 
-void OpenLPClient::get(QString const&urlExt) {
+void OpenLPClient::get(QString const &urlExt) {
 	QUrl url(m_baseUrl + urlExt);
 	QNetworkRequest rqst(url);
 	m_nam->get(rqst);
 }
 
-void OpenLPClient::post(QString const&url, QString const&data) {
+void OpenLPClient::post(QString const &url, QString const &data) {
 	QNetworkRequest rqst(QUrl(m_baseUrl + url));
 	rqst.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 	m_nam->post(rqst, data.toUtf8());
@@ -190,7 +190,7 @@ void OpenLPClient::handleSlideListResponse(QNetworkReply *reply) {
 	QStringList tagList;
 	auto doc = QJsonDocument::fromJson(data);
 	auto items = doc.object()["results"].toObject()["slides"].toArray();
-	for (auto const&item : items) {
+	for (auto const &item : items) {
 		auto const slide = item.toObject();
 		auto text = slide["text"].toString();
 		auto tag = slide["tag"].toString();
