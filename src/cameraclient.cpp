@@ -46,7 +46,7 @@ void CameraClient::setPreset(int const preset) {
 		// VISCA Memory Recall: 81 01 04 3F 02 pp FF
 		std::array<uint8_t, 7> const cmd{
 			0x81, 0x01, 0x04, 0x3F, 0x02,
-			static_cast<uint8_t>(preset - 1),
+			static_cast<uint8_t>(preset),
 			0xFF
 		};
 		sendVisca(cmd);
