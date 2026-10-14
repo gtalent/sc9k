@@ -3,8 +3,8 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-find_package(QT NAMES Qt6 COMPONENTS Network Widgets REQUIRED)
-find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Network Widgets REQUIRED)
+find_package(QT NAMES Qt6 COMPONENTS Network WebSockets Widgets REQUIRED)
+find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Network WebSockets Widgets REQUIRED)
 
 add_executable(
 	SlideController MACOSX_BUNDLE WIN32
@@ -22,6 +22,7 @@ add_executable(
 target_link_libraries(
 	SlideController
 		Qt${QT_VERSION_MAJOR}::Network
+		Qt${QT_VERSION_MAJOR}::WebSockets
 		Qt${QT_VERSION_MAJOR}::Widgets
 )
 

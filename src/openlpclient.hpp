@@ -8,15 +8,13 @@
 
 #pragma once
 
-#include <QByteArray>
 #include <QHash>
-#include <QJsonObject>
 #include <QNetworkAccessManager>
 #include <QObject>
 #include <QString>
 #include <QStringList>
-#include <QTcpSocket>
 #include <QTimer>
+#include <QWebSocket>
 
 #include "consts.hpp"
 
@@ -30,22 +28,20 @@ class OpenLPClient: public QObject {
 		QString m_baseUrl;
 
 		QNetworkAccessManager *m_nam = new QNetworkAccessManager(this);
-		QNetworkAccessManager *m_pollingNam = new QNetworkAccessManager(this);
-		QNetworkAccessManager *m_songListNam = new QNetworkAccessManager(this);
-		QNetworkAccessManager *m_slideListNam = new QNetworkAccessManager(this);
-		QTimer m_pollTimer;
+		QWebSocket m_ws;
+		QTimer m_reconnectTimer;
+		QTimer m_pingTimer;
+		bool m_connected = false;
+		bool m_pongReceived = false;
 
-		QTcpSocket *m_wsSocket = nullptr;
-		QByteArray m_wsReadBuffer;
-		QByteArray m_secWebSocketKey;
-		bool m_wsConnected = false;
-
+		// service item ID -> title
 		QHash<QString, QString> m_songNameMap;
 		QStringList m_songList;
 		QStringList m_currentSlideList;
 		QStringList m_currentTagList;
 		int m_currentServiceId = -1;
 		QString m_currentSongId;
+		QString m_currentSongTitle;
 		int m_currentSlide = 0;
 
 	public:
@@ -76,50 +72,24 @@ class OpenLPClient: public QObject {
 		void setBaseUrl();
 
 	private:
-		void get(QString const &urlExt);
-
 		void post(QString const &urlExt, QString const &data);
 
 		void requestSongList();
 
 		void requestSlideList();
 
-		void connectWebSocket();
+		void resetState();
 
-		void sendWebSocketHandshake();
-
-		void processWebSocketHandshake();
-
-		void processWebSocketFrames();
-
-		void handleWebSocketMessage(QString const &message);
-
-		void sendWebSocketPong(QByteArray const &payload);
-
-		void handleStateJson(QJsonObject const &results);
-
-		void processSlideListJson(QJsonObject const &rootObj);
-
-		void processSongListJson(QJsonArray const &items);
+		void emitUpdate();
 
 	private slots:
-		void poll();
+		void connectToOpenLP();
 
 		void onWsConnected();
 
 		void onWsDisconnected();
 
-		void onWsReadyRead();
-
-		void onWsErrorOccurred(QAbstractSocket::SocketError socketError);
-
-		void handleGeneralResponse(QNetworkReply *reply);
-
-		void handlePollResponse(QNetworkReply *reply);
-
-		void handleSongListResponse(QNetworkReply *reply);
-
-		void handleSlideListResponse(QNetworkReply *reply);
+		void onWsMessage(QByteArray const &message);
 
 	signals:
 		void pollUpdate(QString songId, int slideNum);
@@ -132,4 +102,3 @@ class OpenLPClient: public QObject {
 
 		void songChanged(QString);
 };
-

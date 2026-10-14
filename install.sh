@@ -2,7 +2,7 @@
 
 dist_dir=.
 
-apt-get install -y libqt6widgets6 libqt6network6 qt6-qpa-plugins
+apt-get install -y libqt6widgets6 libqt6network6 libqt6websockets6 qt6-qpa-plugins
 
 install -Dm 755 $dist_dir/bin/SlideController /usr/local/bin/SlideController
 install -Dm 644 $dist_dir/share/applications/net.drinkingtea.sc9k.desktop /usr/share/applications/net.drinkingtea.sc9k.desktop
