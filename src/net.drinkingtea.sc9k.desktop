@@ -9,6 +9,6 @@ Terminal=false
 X-MultipleArgs=false
 Icon=net.drinkingtea.sc9k
 Categories=Multimedia
-Keywords=slide;controller;sc9k
+Keywords=slide;controller;sc9k;9k
 StartupWMClass=SlideController
 StartupNotify=false
