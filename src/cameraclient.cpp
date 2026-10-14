@@ -6,13 +6,11 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-#include <QHostAddress>
 #include <QHostInfo>
-#include <QSettings>
 
+#include "cameraclient.hpp"
 #include "consts.hpp"
 #include "settingsdata.hpp"
-#include "cameraclient.hpp"
 
 CameraClient::CameraClient(QObject *parent): QObject(parent), m_socket(new QUdpSocket(this)) {
 	m_socket->bind(QHostAddress::AnyIPv4, 0);
@@ -24,12 +22,12 @@ CameraClient::CameraClient(QObject *parent): QObject(parent), m_socket(new QUdpS
 	connect(&m_pollTimer, &QTimer::timeout, this, &CameraClient::poll);
 }
 
-void CameraClient::setPresetVC(int const preset, VideoConfig const&vc) {
+void CameraClient::setPresetVC(int const preset, VideoConfig const &vc) {
 	if (preset > 0 && preset <= MaxCameraPresets) {
 		// VISCA Memory Recall: 81 01 04 3F 02 pp FF
 		std::array<uint8_t, 7> const cmd{
 			0x81, 0x01, 0x04, 0x3F, 0x02,
-			static_cast<uint8_t>(preset - 1),
+			static_cast<uint8_t>(preset),
 			0xFF
 		};
 		sendVisca(cmd);
@@ -42,23 +40,9 @@ void CameraClient::setPresetVC(int const preset, VideoConfig const&vc) {
 }
 
 void CameraClient::setPreset(int const preset) {
-	if (preset > 0 && preset <= MaxCameraPresets) {
-		// VISCA Memory Recall: 81 01 04 3F 02 pp FF
-		std::array<uint8_t, 7> const cmd{
-			0x81, 0x01, 0x04, 0x3F, 0x02,
-			static_cast<uint8_t>(preset),
-			0xFF
-		};
-		sendVisca(cmd);
-		auto const vcList = getVideoConfig();
-		if (preset - 1 < vcList.size()) {
-			auto const vc = vcList[preset - 1];
-			setBrightness(vc.brightness);
-			setSaturation(vc.saturation);
-			setContrast(vc.contrast);
-			setSharpness(vc.sharpness);
-			setHue(vc.hue);
-		}
+	auto const vcList = getVideoConfig();
+	if (preset > 0 && preset - 1 < vcList.size()) {
+		setPresetVC(preset, vcList[preset - 1]);
 	}
 }
 
@@ -77,71 +61,68 @@ void CameraClient::setBaseUrl() {
 	m_port = port;
 	m_sequenceNumber = 1;
 	m_missedPolls = 0;
+	m_addr.clear();
+	if (m_lookupId != -1) {
+		QHostInfo::abortHostLookup(m_lookupId);
+		m_lookupId = -1;
+	}
+	if (m_host.isEmpty() || m_addr.setAddress(m_host)) {
+		return;
+	}
+	m_lookupId = QHostInfo::lookupHost(m_host, this, &CameraClient::onHostLookup);
+}
+
+void CameraClient::onHostLookup(QHostInfo const &hostInfo) {
+	if (hostInfo.lookupId() != m_lookupId) {
+		return;
+	}
+	m_lookupId = -1;
+	// socket is bound to IPv4, so only an IPv4 address is usable
+	for (auto const &addr : hostInfo.addresses()) {
+		if (addr.protocol() == QAbstractSocket::IPv4Protocol) {
+			m_addr = addr;
+			return;
+		}
+	}
 }
 
 void CameraClient::setBrightness(int const val) {
-	if (val > -1) {
-		// VISCA Brightness Direct: 81 01 04 4D 00 00 0p 0q FF
-		std::array<uint8_t, 9> const cmd{
-			0x81, 0x01, 0x04, 0x4D, 0x00, 0x00,
-			static_cast<uint8_t>((val >> 4) & 0x0F),
-			static_cast<uint8_t>(val & 0x0F),
-			0xFF
-		};
-		sendVisca(cmd);
-	}
+	// VISCA Brightness Direct: 81 01 04 4D 00 00 0p 0q FF
+	sendDirect(0x4D, val);
 }
 
 void CameraClient::setSaturation(int const val) {
-	if (val > -1) {
-		// VISCA Color Gain Direct: 81 01 04 49 00 00 0p 0q FF
-		std::array<uint8_t, 9> const cmd{
-			0x81, 0x01, 0x04, 0x49, 0x00, 0x00,
-			static_cast<uint8_t>((val >> 4) & 0x0F),
-			static_cast<uint8_t>(val & 0x0F),
-			0xFF
-		};
-		sendVisca(cmd);
-	}
+	// VISCA Color Gain Direct: 81 01 04 49 00 00 0p 0q FF
+	sendDirect(0x49, val);
 }
 
 void CameraClient::setContrast(int const val) {
-	if (val > -1) {
-		// VISCA Contrast Direct: 81 01 04 A2 00 00 0p 0q FF
-		std::array<uint8_t, 9> const cmd{
-			0x81, 0x01, 0x04, 0xA2, 0x00, 0x00,
-			static_cast<uint8_t>((val >> 4) & 0x0F),
-			static_cast<uint8_t>(val & 0x0F),
-			0xFF
-		};
-		sendVisca(cmd);
-	}
+	// VISCA Contrast Direct: 81 01 04 A2 00 00 0p 0q FF
+	sendDirect(0xA2, val);
 }
 
 void CameraClient::setSharpness(int const val) {
-	if (val > -1) {
-		// VISCA Aperture Direct: 81 01 04 42 00 00 0p 0q FF
-		std::array<uint8_t, 9> const cmd{
-			0x81, 0x01, 0x04, 0x42, 0x00, 0x00,
-			static_cast<uint8_t>((val >> 4) & 0x0F),
-			static_cast<uint8_t>(val & 0x0F),
-			0xFF
-		};
-		sendVisca(cmd);
-	}
+	// VISCA Aperture Direct: 81 01 04 42 00 00 0p 0q FF
+	sendDirect(0x42, val);
 }
 
 void CameraClient::setHue(int const val) {
-	if (val > -1) {
-		// VISCA Color Hue Direct: 81 01 04 4F 00 00 0p 0q FF
-		std::array<uint8_t, 9> const cmd{
-			0x81, 0x01, 0x04, 0x4F, 0x00, 0x00,
-			static_cast<uint8_t>((val >> 4) & 0x0F),
-			static_cast<uint8_t>(val & 0x0F),
-			0xFF
-		};
-		sendVisca(cmd);
+	// VISCA Color Hue Direct: 81 01 04 4F 00 00 0p 0q FF
+	sendDirect(0x4F, val);
+}
+
+void CameraClient::sendDirect(uint8_t const opcode, int const val) {
+	if (val < 0) {
+		return;
 	}
+	auto const v = std::min(val, 0xFF);
+	std::array<uint8_t, 9> const cmd{
+		0x81, 0x01, 0x04, opcode, 0x00, 0x00,
+		static_cast<uint8_t>((v >> 4) & 0x0F),
+		static_cast<uint8_t>(v & 0x0F),
+		0xFF
+	};
+	sendVisca(cmd);
 }
 
 ViscaMsg CameraClient::createViscaPacket(std::span<uint8_t const> const viscaMsg, bool const isInquiry) {
@@ -169,21 +150,12 @@ ViscaMsg CameraClient::createViscaPacket(std::span<uint8_t const> const viscaMsg
 }
 
 void CameraClient::sendVisca(std::span<uint8_t const> const viscaMsg, bool const isInquiry) {
-	if (m_host.isEmpty() || m_port == 0) {
+	if (m_addr.isNull() || m_port == 0) {
 		return;
-	}
-	QHostAddress addr;
-	if (!addr.setAddress(m_host)) {
-		auto const hostInfo = QHostInfo::fromName(m_host);
-		if (!hostInfo.addresses().isEmpty()) {
-			addr = hostInfo.addresses().first();
-		} else {
-			return;
-		}
 	}
 	auto const packet = createViscaPacket(viscaMsg, isInquiry);
 	if (packet.size > 0) {
-		m_socket->writeDatagram(reinterpret_cast<char const*>(packet.data.data()), static_cast<qint64>(packet.size), addr, m_port);
+		m_socket->writeDatagram(reinterpret_cast<char const*>(packet.data.data()), static_cast<qint64>(packet.size), m_addr, m_port);
 	}
 }
 
@@ -209,13 +181,11 @@ void CameraClient::onReadyRead() {
 		QHostAddress sender;
 		quint16 senderPort = 0;
 		m_socket->readDatagram(datagram.data(), datagram.size(), &sender, &senderPort);
-		if (datagram.isEmpty()) {
+		if (datagram.isEmpty() || !sender.isEqual(m_addr)) {
 			continue;
 		}
 		m_missedPolls = 0;
-		if (!m_connected) {
-			m_connected = true;
-		}
+		m_connected = true;
 		emit pollUpdate();
 	}
 }

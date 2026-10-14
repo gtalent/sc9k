@@ -12,6 +12,8 @@
 #include <array>
 #include <cstdint>
 #include <span>
+
+#include <QHostAddress>
 #include <QObject>
 #include <QString>
 #include <QTimer>
@@ -28,6 +30,8 @@ class CameraClient: public QObject {
 	Q_OBJECT
 	private:
 		QString m_host;
+		QHostAddress m_addr;
+		int m_lookupId = -1;
 		uint16_t m_port = 52381;
 		QUdpSocket *const m_socket = nullptr;
 		QTimer m_pollTimer;
@@ -57,6 +61,10 @@ class CameraClient: public QObject {
 		void setSharpness(int val);
 
 		void setHue(int val);
+
+		void sendDirect(uint8_t opcode, int val);
+
+		void onHostLookup(class QHostInfo const &hostInfo);
 
 		void sendVisca(std::span<uint8_t const> viscaMsg, bool isInquiry = false);
 
