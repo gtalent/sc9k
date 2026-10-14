@@ -42,6 +42,8 @@ class OpenLPClient: public QObject {
 
 		QHash<QString, QString> m_songNameMap;
 		QStringList m_songList;
+		QStringList m_currentSlideList;
+		QStringList m_currentTagList;
 		int m_currentServiceId = -1;
 		QString m_currentSongId;
 		int m_currentSlide = 0;
@@ -74,9 +76,9 @@ class OpenLPClient: public QObject {
 		void setBaseUrl();
 
 	private:
-		void get(QString const &url);
+		void get(QString const &urlExt);
 
-		void post(QString const &url, QString const &data);
+		void post(QString const &urlExt, QString const &data);
 
 		void requestSongList();
 
@@ -95,6 +97,10 @@ class OpenLPClient: public QObject {
 		void sendWebSocketPong(QByteArray const &payload);
 
 		void handleStateJson(QJsonObject const &results);
+
+		void processSlideListJson(QJsonObject const &rootObj);
+
+		void processSongListJson(QJsonArray const &items);
 
 	private slots:
 		void poll();

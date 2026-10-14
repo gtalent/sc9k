@@ -25,6 +25,8 @@ OpenLPClient::OpenLPClient(QObject *parent): QObject(parent), m_wsSocket(new QTc
 	connect(m_wsSocket, &QTcpSocket::errorOccurred, this, &OpenLPClient::onWsErrorOccurred);
 
 	setBaseUrl();
+	requestSlideList();
+	requestSongList();
 	poll();
 	m_pollTimer.start(250);
 	connect(&m_pollTimer, &QTimer::timeout, this, &OpenLPClient::poll);
@@ -35,7 +37,12 @@ OpenLPClient::OpenLPClient(QObject *parent): QObject(parent), m_wsSocket(new QTc
 }
 
 QString OpenLPClient::getNextSong() {
-	auto const currentSong = m_songNameMap[m_currentSongId];
+	QString currentSong;
+	if (m_songNameMap.contains(m_currentSongId)) {
+		currentSong = m_songNameMap.value(m_currentSongId);
+	} else if (m_songList.contains(m_currentSongId)) {
+		currentSong = m_currentSongId;
+	}
 	auto const songIdx = m_songList.indexOf(currentSong) + 1;
 	if (songIdx > 0 && songIdx < m_songList.size()) {
 		return m_songList[songIdx];
@@ -45,18 +52,24 @@ QString OpenLPClient::getNextSong() {
 
 void OpenLPClient::nextSlide() {
 	post("/api/v2/controller/progress", R"({"action":"next"})");
+	requestSlideList();
 }
 
 void OpenLPClient::prevSlide() {
 	post("/api/v2/controller/progress", R"({"action":"previous"})");
+	requestSlideList();
 }
 
 void OpenLPClient::nextSong() {
 	post("/api/v2/service/progress", R"({"action":"next"})");
+	requestSlideList();
+	requestSongList();
 }
 
 void OpenLPClient::prevSong() {
 	post("/api/v2/service/progress", R"({"action":"previous"})");
+	requestSlideList();
+	requestSongList();
 }
 
 void OpenLPClient::blankScreen() {
@@ -77,10 +90,12 @@ void OpenLPClient::setSlidesVisible(bool const value) {
 
 void OpenLPClient::changeSong(int const it) {
 	post("/api/v2/service/show", QString(R"({"id":%1})").arg(it));
+	requestSlideList();
 }
 
 void OpenLPClient::changeSlide(int const slide) {
 	post("/api/v2/controller/show", QString(R"({"id":%1})").arg(slide));
+	requestSlideList();
 }
 
 void OpenLPClient::setBaseUrl() {
@@ -106,22 +121,18 @@ void OpenLPClient::get(QString const &urlExt) {
 	m_nam->get(rqst);
 }
 
-void OpenLPClient::post(QString const &url, QString const &data) {
-	QNetworkRequest rqst(QUrl(m_baseUrl + url));
+void OpenLPClient::post(QString const &urlExt, QString const &data) {
+	QNetworkRequest rqst(QUrl(m_baseUrl + urlExt));
 	rqst.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 	m_nam->post(rqst, data.toUtf8());
 }
 
 void OpenLPClient::requestSongList() {
-	QUrl url(m_baseUrl + "/api/v2/service/items");
-	QNetworkRequest rqst(url);
-	m_songListNam->get(rqst);
+	m_songListNam->get(QNetworkRequest(QUrl(m_baseUrl + "/api/v2/service/items")));
 }
 
 void OpenLPClient::requestSlideList() {
-	QUrl url(m_baseUrl + "/api/v2/controller/live-items");
-	QNetworkRequest rqst(url);
-	m_slideListNam->get(rqst);
+	m_slideListNam->get(QNetworkRequest(QUrl(m_baseUrl + "/api/v2/controller/live-items")));
 }
 
 void OpenLPClient::connectWebSocket() {
@@ -138,9 +149,13 @@ void OpenLPClient::poll() {
 	if (!m_wsConnected && m_wsSocket->state() == QAbstractSocket::UnconnectedState) {
 		connectWebSocket();
 	}
-	QUrl url(m_baseUrl + "/api/v2/core/system");
-	QNetworkRequest rqst(url);
-	m_pollingNam->get(rqst);
+	if (!m_wsConnected) {
+		m_pollingNam->get(QNetworkRequest{QUrl{m_baseUrl + "/api/v2/core/system"}});
+	}
+	requestSlideList();
+	if (m_songList.isEmpty()) {
+		requestSongList();
+	}
 }
 
 void OpenLPClient::onWsConnected() {
@@ -168,13 +183,35 @@ void OpenLPClient::sendWebSocketHandshake() {
 }
 
 void OpenLPClient::onWsDisconnected() {
-	m_wsConnected = false;
-	m_wsReadBuffer.clear();
+	if (m_wsConnected) {
+		m_wsConnected = false;
+		m_wsReadBuffer.clear();
+		m_currentServiceId = -1;
+		m_currentSongId = "";
+		m_currentSlideList.clear();
+		m_currentTagList.clear();
+		m_songNameMap.clear();
+		m_songList.clear();
+		emit pollFailed();
+	} else {
+		m_wsReadBuffer.clear();
+	}
 }
 
 void OpenLPClient::onWsErrorOccurred(QAbstractSocket::SocketError) {
-	m_wsConnected = false;
-	m_wsReadBuffer.clear();
+	if (m_wsConnected) {
+		m_wsConnected = false;
+		m_wsReadBuffer.clear();
+		m_currentServiceId = -1;
+		m_currentSongId = "";
+		m_currentSlideList.clear();
+		m_currentTagList.clear();
+		m_songNameMap.clear();
+		m_songList.clear();
+		emit pollFailed();
+	} else {
+		m_wsReadBuffer.clear();
+	}
 }
 
 void OpenLPClient::onWsReadyRead() {
@@ -204,6 +241,8 @@ void OpenLPClient::processWebSocketHandshake() {
 	}
 
 	m_wsConnected = true;
+	requestSlideList();
+	requestSongList();
 	processWebSocketFrames();
 }
 
@@ -216,9 +255,9 @@ void OpenLPClient::processWebSocketFrames() {
 		auto const b0 = static_cast<quint8>(m_wsReadBuffer[0]);
 		auto const b1 = static_cast<quint8>(m_wsReadBuffer[1]);
 
-		int const opcode = (b0 & 0x0F);
+		int const opcode = b0 & 0x0F;
 		bool const masked = (b1 & 0x80) != 0;
-		quint64 payloadLen = (b1 & 0x7F);
+		quint64 payloadLen = b1 & 0x7F;
 
 		qsizetype headerSize = 2;
 		if (payloadLen == 126) {
@@ -307,7 +346,7 @@ void OpenLPClient::sendWebSocketPong(QByteArray const &payload) {
 
 	QByteArray maskedPayload = payload;
 	for (qsizetype i = 0; i < maskedPayload.size(); ++i) {
-		maskedPayload[i] = maskedPayload[i] ^ maskBytes[i % 4];
+		maskedPayload[i] = static_cast<char>(maskedPayload[i] ^ maskBytes[i % 4]);
 	}
 	frame.append(maskedPayload);
 
@@ -317,45 +356,146 @@ void OpenLPClient::sendWebSocketPong(QByteArray const &payload) {
 void OpenLPClient::handleWebSocketMessage(QString const &message) {
 	QJsonParseError err;
 	auto const doc = QJsonDocument::fromJson(message.toUtf8(), &err);
-	if (err.error != QJsonParseError::NoError || !doc.isObject()) {
+	if (err.error != QJsonParseError::NoError) {
+		requestSlideList();
 		return;
 	}
-	handleStateJson(doc.object());
+	if (doc.isArray()) {
+		QJsonObject rootObj;
+		rootObj["slides"] = doc.array();
+		processSlideListJson(rootObj);
+		return;
+	}
+	if (!doc.isObject()) {
+		requestSlideList();
+		return;
+	}
+	auto const obj = doc.object();
+
+	// Check if this payload has embedded slide deck
+	if (obj.contains("slides") ||
+	    (obj.contains("results") && obj["results"].isObject() && obj["results"].toObject().contains("slides")) ||
+	    (obj.contains("data") && obj["data"].isObject() && obj["data"].toObject().contains("slides"))) {
+		processSlideListJson(obj);
+	}
+
+	// Check if this payload has embedded service items
+	if (obj.contains("items") ||
+	    (obj.contains("results") && obj["results"].isObject() && obj["results"].toObject().contains("items")) ||
+	    (obj.contains("data") && obj["data"].isObject() && obj["data"].toObject().contains("items"))) {
+		QJsonArray items;
+		if (obj.contains("items")) {
+			items = obj["items"].toArray();
+		} else if (obj.contains("results") && obj["results"].toObject().contains("items")) {
+			items = obj["results"].toObject()["items"].toArray();
+		} else if (obj.contains("data") && obj["data"].toObject().contains("items")) {
+			items = obj["data"].toObject()["items"].toArray();
+		}
+		processSongListJson(items);
+	}
+
+	requestSlideList();
+
+	QString eventName;
+	if (obj.contains("event")) {
+		eventName = obj["event"].toString();
+	} else if (obj.contains("topic")) {
+		eventName = obj["topic"].toString();
+	} else if (obj.contains("type")) {
+		eventName = obj["type"].toString();
+	} else if (obj.contains("action")) {
+		eventName = obj["action"].toString();
+	}
+
+	if (!eventName.isEmpty()) {
+		auto const lowerEvent = eventName.toLower();
+		if (lowerEvent.contains("service")) {
+			requestSongList();
+		}
+	}
+
+	handleStateJson(obj);
 }
 
 void OpenLPClient::handleStateJson(QJsonObject const &obj) {
 	QJsonObject results;
-	if (obj.contains("results")) {
+	if (obj.contains("results") && obj["results"].isObject()) {
 		results = obj["results"].toObject();
+	} else if (obj.contains("data") && obj["data"].isObject()) {
+		results = obj["data"].toObject();
+	} else if (obj.contains("payload") && obj["payload"].isObject()) {
+		results = obj["payload"].toObject();
 	} else {
 		results = obj;
 	}
 	if (results.isEmpty()) {
 		return;
 	}
-	auto songId = results["item"].toVariant().toString();
-	auto slide = results["slide"].toInt();
-	auto service = results["service"].toInt();
 
-	m_currentSlide = slide;
-
-	if (service != m_currentServiceId) {
-		requestSongList();
-		m_currentServiceId = service;
+	if (results.contains("service")) {
+		auto const service = results["service"].toInt();
+		if (service != m_currentServiceId) {
+			requestSongList();
+			m_currentServiceId = service;
+		}
 	}
-	if (m_currentSongId != songId) {
-		requestSlideList();
+
+	bool const hasItem = results.contains("item") || results.contains("id") || results.contains("item_id");
+
+	QString songId;
+	if (results.contains("item")) {
+		songId = results["item"].toVariant().toString();
+	} else if (results.contains("id")) {
+		songId = results["id"].toVariant().toString();
+	} else if (results.contains("item_id")) {
+		songId = results["item_id"].toVariant().toString();
+	}
+
+	if (results.contains("slide")) {
+		m_currentSlide = results["slide"].toInt();
+	} else if (results.contains("selected_slide")) {
+		m_currentSlide = results["selected_slide"].toInt();
+	} else if (results.contains("selected") && results["selected"].isDouble()) {
+		m_currentSlide = results["selected"].toInt();
+	}
+
+	if (hasItem && !songId.isEmpty() && m_currentSongId != songId) {
 		m_currentSongId = songId;
+		requestSlideList();
 		emit songChanged(songId);
 	}
-	emit pollUpdate(m_songNameMap.value(songId), slide);
+
+	QString songTitle;
+	if (!songId.isEmpty()) {
+		songTitle = m_songNameMap.value(songId, songId);
+	} else if (!m_currentSongId.isEmpty()) {
+		songTitle = m_songNameMap.value(m_currentSongId, m_currentSongId);
+	}
+
+	if (!songTitle.isEmpty()) {
+		emit pollUpdate(songTitle, m_currentSlide);
+	}
 }
 
 void OpenLPClient::handleGeneralResponse(QNetworkReply *reply) {
 	reply->deleteLater();
 	if (reply->error()) {
 		qDebug() << "OpenLPClient error response:" << reply->request().url() << ":" << reply->errorString();
+		return;
 	}
+	auto data = reply->readAll();
+	if (!data.isEmpty()) {
+		auto doc = QJsonDocument::fromJson(data);
+		if (doc.isObject()) {
+			auto obj = doc.object();
+			if (obj.contains("slides") ||
+			    (obj.contains("results") && obj["results"].isObject() && obj["results"].toObject().contains("slides")) ||
+			    (obj.contains("data") && obj["data"].isObject() && obj["data"].toObject().contains("slides"))) {
+				processSlideListJson(obj);
+			}
+		}
+	}
+	requestSlideList();
 }
 
 void OpenLPClient::handlePollResponse(QNetworkReply *reply) {
@@ -367,6 +507,7 @@ void OpenLPClient::handlePollResponse(QNetworkReply *reply) {
 			m_currentServiceId = -1;
 			m_currentSongId = "";
 			m_songNameMap.clear();
+			m_songList.clear();
 		}
 		return;
 	}
@@ -387,13 +528,46 @@ void OpenLPClient::handlePollResponse(QNetworkReply *reply) {
 				}
 				connectWebSocket();
 			}
-			if (!m_wsConnected && m_currentSongId.isEmpty()) {
-				requestSlideList();
-				requestSongList();
-			}
-		} else if (rootObj.contains("results")) {
+		}
+		if (rootObj.contains("results")) {
 			handleStateJson(rootObj);
 		}
+	}
+}
+
+void OpenLPClient::processSongListJson(QJsonArray const &items) {
+	QHash<QString, QString> newSongNameMap;
+	QStringList newSongList;
+	for (auto const &item : items) {
+		auto song = item.toObject();
+		auto name = song["title"].toString();
+		if (name.isEmpty() && song.contains("name")) {
+			name = song["name"].toString();
+		}
+		auto id = song["id"].toVariant().toString();
+		if (id.isEmpty() && song.contains("item_id")) {
+			id = song["item_id"].toVariant().toString();
+		}
+		if (!id.isEmpty()) {
+			newSongNameMap[id] = name;
+		}
+		if (!name.isEmpty()) {
+			newSongNameMap[name] = name;
+			newSongList.push_back(name);
+		}
+	}
+	m_songNameMap = std::move(newSongNameMap);
+	bool const listChanged = (m_songList != newSongList);
+	if (listChanged) {
+		m_songList = newSongList;
+		emit songListUpdate(m_songList);
+	}
+	QString currentSongTitle;
+	if (!m_currentSongId.isEmpty()) {
+		currentSongTitle = m_songNameMap.value(m_currentSongId);
+	}
+	if (!currentSongTitle.isEmpty()) {
+		emit pollUpdate(currentSongTitle, m_currentSlide);
 	}
 }
 
@@ -414,58 +588,95 @@ void OpenLPClient::handleSongListResponse(QNetworkReply *reply) {
 	} else if (doc.isObject()) {
 		auto rootObj = doc.object();
 		if (rootObj.contains("results")) {
-			items = rootObj["results"].toObject()["items"].toArray();
+			auto resultsObj = rootObj["results"].toObject();
+			if (resultsObj.contains("items")) {
+				items = resultsObj["items"].toArray();
+			}
 		} else if (rootObj.contains("items")) {
 			items = rootObj["items"].toArray();
 		}
 	}
-	m_songNameMap.clear();
-	m_songList.clear();
-	for (auto const &item : items) {
-		auto song = item.toObject();
-		auto name = song["title"].toString();
-		auto id = song["id"].toVariant().toString();
-		m_songNameMap[id] = name;
-		m_songList.push_back(name);
-	}
-	emit songListUpdate(m_songList);
-	if (!m_currentSongId.isEmpty() && m_songNameMap.contains(m_currentSongId)) {
-		emit pollUpdate(m_songNameMap[m_currentSongId], m_currentSlide);
-	}
+	processSongListJson(items);
 }
 
-void OpenLPClient::handleSlideListResponse(QNetworkReply *reply) {
-	reply->deleteLater();
-	if (reply->error()) {
-		qDebug() << "OpenLPClient error response:" << reply->errorString();
-		return;
-	}
-	auto data = reply->readAll();
-	if (data.isEmpty()) {
-		return;
-	}
+void OpenLPClient::processSlideListJson(QJsonObject const &rootObj) {
 	QStringList slideList;
 	QStringList tagList;
-	auto doc = QJsonDocument::fromJson(data);
 	QJsonArray items;
 	int selectedSlide = -1;
 	QString itemId;
+	QString itemTitle;
 
-	if (doc.isObject()) {
-		auto rootObj = doc.object();
-		if (rootObj.contains("id")) {
-			itemId = rootObj["id"].toVariant().toString();
-		}
-		if (rootObj.contains("slides")) {
-			items = rootObj["slides"].toArray();
-		} else if (rootObj.contains("results")) {
-			auto resultsObj = rootObj["results"].toObject();
-			if (resultsObj.contains("slides")) {
-				items = resultsObj["slides"].toArray();
+	if (rootObj.contains("id")) {
+		itemId = rootObj["id"].toVariant().toString();
+	} else if (rootObj.contains("item_id")) {
+		itemId = rootObj["item_id"].toVariant().toString();
+	}
+	if (rootObj.contains("title")) {
+		itemTitle = rootObj["title"].toString();
+	} else if (rootObj.contains("name")) {
+		itemTitle = rootObj["name"].toString();
+	}
+	if (rootObj.contains("selected_slide")) {
+		selectedSlide = rootObj["selected_slide"].toInt();
+	} else if (rootObj.contains("selected") && rootObj["selected"].isDouble()) {
+		selectedSlide = rootObj["selected"].toInt();
+	}
+
+	if (rootObj.contains("slides")) {
+		items = rootObj["slides"].toArray();
+	} else if (rootObj.contains("results")) {
+		auto resultsObj = rootObj["results"].toObject();
+		if (itemId.isEmpty()) {
+			if (resultsObj.contains("id")) {
+				itemId = resultsObj["id"].toVariant().toString();
+			} else if (resultsObj.contains("item_id")) {
+				itemId = resultsObj["item_id"].toVariant().toString();
 			}
 		}
-	} else if (doc.isArray()) {
-		items = doc.array();
+		if (itemTitle.isEmpty()) {
+			if (resultsObj.contains("title")) {
+				itemTitle = resultsObj["title"].toString();
+			} else if (resultsObj.contains("name")) {
+				itemTitle = resultsObj["name"].toString();
+			}
+		}
+		if (selectedSlide < 0) {
+			if (resultsObj.contains("selected_slide")) {
+				selectedSlide = resultsObj["selected_slide"].toInt();
+			} else if (resultsObj.contains("selected") && resultsObj["selected"].isDouble()) {
+				selectedSlide = resultsObj["selected"].toInt();
+			}
+		}
+		if (resultsObj.contains("slides")) {
+			items = resultsObj["slides"].toArray();
+		}
+	} else if (rootObj.contains("data")) {
+		auto dataObj = rootObj["data"].toObject();
+		if (itemId.isEmpty()) {
+			if (dataObj.contains("id")) {
+				itemId = dataObj["id"].toVariant().toString();
+			} else if (dataObj.contains("item_id")) {
+				itemId = dataObj["item_id"].toVariant().toString();
+			}
+		}
+		if (itemTitle.isEmpty()) {
+			if (dataObj.contains("title")) {
+				itemTitle = dataObj["title"].toString();
+			} else if (dataObj.contains("name")) {
+				itemTitle = dataObj["name"].toString();
+			}
+		}
+		if (selectedSlide < 0) {
+			if (dataObj.contains("selected_slide")) {
+				selectedSlide = dataObj["selected_slide"].toInt();
+			} else if (dataObj.contains("selected") && dataObj["selected"].isDouble()) {
+				selectedSlide = dataObj["selected"].toInt();
+			}
+		}
+		if (dataObj.contains("slides")) {
+			items = dataObj["slides"].toArray();
+		}
 	}
 
 	for (int i = 0; i < items.size(); ++i) {
@@ -482,17 +693,57 @@ void OpenLPClient::handleSlideListResponse(QNetworkReply *reply) {
 		tagList.push_back(std::move(tag));
 	}
 
-	if (!itemId.isEmpty() && m_currentSongId != itemId) {
-		m_currentSongId = itemId;
-		emit songChanged(itemId);
+	QString songIdentifier = itemId;
+	if (songIdentifier.isEmpty()) {
+		songIdentifier = itemTitle;
 	}
+
+	if (!songIdentifier.isEmpty() && m_currentSongId != songIdentifier) {
+		m_currentSongId = songIdentifier;
+		emit songChanged(songIdentifier);
+	}
+
 	if (selectedSlide >= 0) {
 		m_currentSlide = selectedSlide;
 	}
 
-	emit slideListUpdate(tagList, slideList);
+	bool const slidesChanged = (m_currentSlideList != slideList || m_currentTagList != tagList);
+	if (slidesChanged) {
+		m_currentSlideList = slideList;
+		m_currentTagList = tagList;
+		emit slideListUpdate(tagList, slideList);
+	}
 
+	QString songTitle;
 	if (!m_currentSongId.isEmpty() && m_songNameMap.contains(m_currentSongId)) {
-		emit pollUpdate(m_songNameMap[m_currentSongId], m_currentSlide);
+		songTitle = m_songNameMap.value(m_currentSongId);
+	} else if (!itemTitle.isEmpty()) {
+		songTitle = itemTitle;
+	} else if (!m_currentSongId.isEmpty() && m_songList.contains(m_currentSongId)) {
+		songTitle = m_currentSongId;
+	}
+
+	if (!songTitle.isEmpty()) {
+		emit pollUpdate(songTitle, m_currentSlide);
+	}
+}
+
+void OpenLPClient::handleSlideListResponse(QNetworkReply *reply) {
+	reply->deleteLater();
+	if (reply->error()) {
+		qDebug() << "OpenLPClient error response:" << reply->errorString();
+		return;
+	}
+	auto data = reply->readAll();
+	if (data.isEmpty()) {
+		return;
+	}
+	auto doc = QJsonDocument::fromJson(data);
+	if (doc.isObject()) {
+		processSlideListJson(doc.object());
+	} else if (doc.isArray()) {
+		QJsonObject rootObj;
+		rootObj["slides"] = doc.array();
+		processSlideListJson(rootObj);
 	}
 }
