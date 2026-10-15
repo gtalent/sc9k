@@ -149,11 +149,12 @@ QWidget *SettingsDialog::setupCameraPresetConfig(QWidget *parent) {
 			m_tilt = mkSb(grp, formLyt, tr("T&ilt:"), -0x8000, 0x7FFF);
 			m_zoom = mkSb(grp, formLyt, tr("&Zoom:"), 0, 0xFFFF);
 			m_getPtzBtn = new QPushButton(tr("&Get Current"), grp);
-			m_getPtzBtn->setToolTip(tr("Fill in the camera's current position"));
 			formLyt->addRow(m_getPtzBtn);
+			updateGetPtzEnabled();
 			connect(m_getPtzBtn, &QPushButton::clicked, this, [this] {
-				m_getPtzBtn->setEnabled(false);
-				m_errLbl->clear();
+				m_ptzQueryPending = true;
+				updateGetPtzEnabled();
+				setError({});
 				emit requestPtzPosition();
 			});
 		}
@@ -194,8 +195,14 @@ QWidget *SettingsDialog::setupCameraPresetConfig(QWidget *parent) {
 	return root;
 }
 
+void SettingsDialog::setCameraConnected(bool const connected) {
+	m_cameraConnected = connected;
+	updateGetPtzEnabled();
+}
+
 void SettingsDialog::setPtzPosition(int const pan, int const tilt, int const zoom) {
-	m_getPtzBtn->setEnabled(true);
+	m_ptzQueryPending = false;
+	updateGetPtzEnabled();
 	m_usePtz->setChecked(true);
 	m_pan->setValue(pan);
 	m_tilt->setValue(tilt);
@@ -203,8 +210,9 @@ void SettingsDialog::setPtzPosition(int const pan, int const tilt, int const zoo
 }
 
 void SettingsDialog::ptzPositionQueryFailed() {
-	m_getPtzBtn->setEnabled(true);
-	m_errLbl->setText(tr("Camera did not report its position."));
+	m_ptzQueryPending = false;
+	updateGetPtzEnabled();
+	setError(tr("Camera did not report its position."));
 }
 
 QWidget *SettingsDialog::setupViewConfig(QWidget *parent) {
@@ -298,6 +306,11 @@ void SettingsDialog::setDirty(bool const dirty) {
 	}
 }
 
+void SettingsDialog::setError(QString const &msg) const {
+	m_errLbl->setText(msg);
+	m_errLbl->setToolTip(msg);
+}
+
 int SettingsDialog::handleApply() {
 	QSettings settings;
 	QVector<View> views;
@@ -325,6 +338,7 @@ int SettingsDialog::handleApply() {
 		.panTilt = m_panTiltSpeed->value(),
 		.zoom = m_zoomSpeed->value(),
 	});
+	setError({});
 	setDirty(false);
 	emit settingsApplied();
     return 0;
@@ -361,12 +375,12 @@ int SettingsDialog::collectViews(QVector<View> &views) const {
 		bool ok = false;
 		auto const name = m_viewTable->item(row, ViewColumn::Name)->text();
 		if (name.trimmed() == "") {
-			m_errLbl->setText(tr("View %1 has no name.").arg(viewNo));
+			setError(tr("View %1 has no name.").arg(viewNo));
 			return 1;
 		}
 		auto const cameraPreset = m_viewTable->item(row, ViewColumn::CameraPreset)->text().toInt(&ok);
 		if (!ok || cameraPreset < 1 || cameraPreset > MaxCameraPresets) {
-			m_errLbl->setText(tr("View %1 has invalid preset (1-%2)").arg(viewNo).arg(MaxCameraPresets));
+			setError(tr("View %1 has invalid preset (1-%2)").arg(viewNo).arg(MaxCameraPresets));
 			return 2;
 		}
 		views.emplace_back(View{
@@ -436,5 +450,14 @@ void SettingsDialog::updatePtzEnabled() {
 		if (sb) {
 			sb->setEnabled(enabled);
 		}
+	}
+}
+
+void SettingsDialog::updateGetPtzEnabled() {
+	if (m_getPtzBtn) {
+		m_getPtzBtn->setEnabled(m_cameraConnected && !m_ptzQueryPending);
+		m_getPtzBtn->setToolTip(m_cameraConnected ?
+			tr("Fill in the camera's current position") :
+			tr("Functionality is unavailable when camera is not connected"));
 	}
 }

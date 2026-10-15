@@ -114,6 +114,10 @@ void CameraClient::reboot() {
 	emit pollFailed();
 }
 
+bool CameraClient::connected() const noexcept {
+	return m_connected;
+}
+
 void CameraClient::queryPtzPosition() {
 	m_ptzQuery = PtzQuery{.panTiltGen = m_panTiltGen, .zoomGen = m_zoomGen};
 	auto const id = ++m_ptzQueryId;

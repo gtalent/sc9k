@@ -253,6 +253,9 @@ void MainWindow::openSettings() {
 	connect(&d, &SettingsDialog::requestPtzPosition, &m_cameraClient, &CameraClient::queryPtzPosition);
 	connect(&m_cameraClient, &CameraClient::ptzPositionReceived, &d, &SettingsDialog::setPtzPosition);
 	connect(&m_cameraClient, &CameraClient::ptzPositionQueryFailed, &d, &SettingsDialog::ptzPositionQueryFailed);
+	d.setCameraConnected(m_cameraClient.connected());
+	connect(&m_cameraClient, &CameraClient::pollUpdate, &d, [&d] { d.setCameraConnected(true); });
+	connect(&m_cameraClient, &CameraClient::pollFailed, &d, [&d] { d.setCameraConnected(false); });
 	// apply on Apply as well as OK, since Apply disables OK and leaves only Cancel to close the dialog
 	connect(&d, &SettingsDialog::settingsApplied, this, [this] {
 		m_cameraClient.reloadConnectionSettings();

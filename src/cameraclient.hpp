@@ -99,6 +99,9 @@ class CameraClient: public QObject {
 
 		void reboot();
 
+		[[nodiscard]]
+		bool connected() const noexcept;
+
 		/**
 		 * Requests the current pan, tilt, and zoom position.
 		 * Emits ptzPositionReceived or ptzPositionQueryFailed.

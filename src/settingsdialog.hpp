@@ -37,12 +37,16 @@ class SettingsDialog: public QDialog {
 		class QSpinBox *m_tilt = nullptr;
 		class QSpinBox *m_zoom = nullptr;
 		class QPushButton *m_getPtzBtn = nullptr;
+		bool m_cameraConnected = false;
+		bool m_ptzQueryPending = false;
 		class QSpinBox *m_panTiltSpeed = nullptr;
 		class QSpinBox *m_zoomSpeed = nullptr;
 		int m_vidCurrentPreset = 0;
 		class QTableWidget *m_viewTable = nullptr;
 	public:
 		explicit SettingsDialog(QWidget *parent);
+
+		void setCameraConnected(bool connected);
 
 		void setPtzPosition(int pan, int tilt, int zoom);
 
@@ -56,6 +60,10 @@ class SettingsDialog: public QDialog {
         int handleApply();
 		void handleOK();
 		void setDirty(bool dirty);
+		/**
+		 * Shows the error, with the full message in a tool tip in case the label is cut off.
+		 */
+		void setError(QString const &msg) const;
 		void setupViewRow(int row, View const &view = {});
 		/**
 		 * Gets views from table.
@@ -67,6 +75,7 @@ class SettingsDialog: public QDialog {
 		void updateCameraPreset(int preset);
 		void updateCameraPresetCollect(int preset);
 		void updatePtzEnabled();
+		void updateGetPtzEnabled();
 	signals:
 		void previewPreset(int, CameraPreset const&);
 
