@@ -12,8 +12,6 @@
 #include "consts.hpp"
 #include "settingsdata.hpp"
 
-namespace {
-
 constexpr auto PtzTickMs = 150;
 // how long to wait for the starting position before moving everything at once
 constexpr auto LocateTimeoutMs = 1500;
@@ -26,7 +24,7 @@ constexpr auto ZoomTolerance = 16;
 constexpr auto PtzQueryTimeoutMs = 2000;
 
 [[nodiscard]]
-int readNibbles(std::span<uint8_t const> const src) {
+static constexpr int readNibbles(std::span<uint8_t const> const src) {
 	int out = 0;
 	for (auto const n : src) {
 		out = (out << 4) | (n & 0x0F);
@@ -35,20 +33,18 @@ int readNibbles(std::span<uint8_t const> const src) {
 }
 
 [[nodiscard]]
-int signExtend(int const val, size_t const bits) {
+static constexpr int signExtend(int const val, size_t const bits) {
 	auto const signBit = 1 << (bits - 1);
 	return (val & signBit) ? val - (1 << bits) : val;
 }
 
 template<size_t Sz>
-size_t writeNibbles(std::array<uint8_t, Sz> &dst, size_t i, int const val, size_t const count) {
+static constexpr size_t writeNibbles(std::array<uint8_t, Sz> &dst, size_t i, int const val, size_t const count) {
 	auto const u = static_cast<uint32_t>(val);
 	for (auto n = count; n > 0; --n) {
 		dst[i++] = static_cast<uint8_t>((u >> ((n - 1) * 4)) & 0x0F);
 	}
 	return i;
-}
-
 }
 
 CameraClient::CameraClient(QObject *parent): QObject(parent), m_socket(new QUdpSocket(this)) {
