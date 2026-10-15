@@ -2,7 +2,9 @@
 .clangd
 .conanbuild
 .current_build
+.dist
 .idea
+.stignore
 __pycache__
 CMakeLists.txt.user
 Session.vim
