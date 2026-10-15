@@ -150,6 +150,16 @@ void MainWindow::setupMenu() {
 			});
 			menu->addAction(cameraPresetAct);
 		}
+		menu->addSeparator();
+		auto const rebootAct = new QAction(tr("&Reboot"), this);
+		connect(rebootAct, &QAction::triggered, this, [this] {
+			auto const btn = QMessageBox::question(
+				this, tr("Reboot Camera"), tr("Are you sure you want to reboot the camera?"));
+			if (btn == QMessageBox::Yes) {
+				m_cameraClient.reboot();
+			}
+		});
+		menu->addAction(rebootAct);
 	}
 	// help menu
 	{
