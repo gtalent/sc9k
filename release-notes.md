@@ -2,7 +2,7 @@
 # 1.2.0
 
 * Replace connection status text in status bar with colored indicators
-* Add Reboot Camera option to Camera menu
+* Add Power On, Power Off, and Reboot options to Camera menu
 * Only enable OK and Apply buttons in settings dialog upon changes made
 * Change OBS integration to use the builtin WebSocket API instead of custom script
 * Change camera client to use VISCA

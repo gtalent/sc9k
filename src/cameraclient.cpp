@@ -50,17 +50,23 @@ void CameraClient::setPreset(int const preset) {
 	}
 }
 
+void CameraClient::powerOn() {
+	// VISCA Power On: 81 01 04 00 02 FF
+	constexpr std::array<uint8_t, 6> cmd{0x81, 0x01, 0x04, 0x00, 0x02, 0xFF};
+	sendVisca(cmd);
+}
+
+void CameraClient::powerOff() {
+	// VISCA Power Off / Standby: 81 01 04 00 03 FF
+	constexpr std::array<uint8_t, 6> cmd{0x81, 0x01, 0x04, 0x00, 0x03, 0xFF};
+	sendVisca(cmd);
+}
+
 void CameraClient::reboot() {
 	// VISCA has no reboot command, so power cycle instead
-	// VISCA Power Off / Standby: 81 01 04 00 03 FF
-	constexpr std::array<uint8_t, 6> offCmd{0x81, 0x01, 0x04, 0x00, 0x03, 0xFF};
-	sendVisca(offCmd);
+	powerOff();
 	// give the camera time to finish entering standby before powering back on
-	QTimer::singleShot(5000, this, [this] {
-		// VISCA Power On: 81 01 04 00 02 FF
-		constexpr std::array<uint8_t, 6> onCmd{0x81, 0x01, 0x04, 0x00, 0x02, 0xFF};
-		sendVisca(onCmd);
-	});
+	QTimer::singleShot(5000, this, &CameraClient::powerOn);
 	m_connected = false;
 	m_missedPolls = 3;
 	emit pollFailed();

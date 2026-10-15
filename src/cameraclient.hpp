@@ -46,6 +46,10 @@ class CameraClient: public QObject {
 
 		void setPreset(int preset);
 
+		void powerOn();
+
+		void powerOff();
+
 		void reboot();
 
 	public slots:

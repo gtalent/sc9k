@@ -151,6 +151,18 @@ void MainWindow::setupMenu() {
 			menu->addAction(cameraPresetAct);
 		}
 		menu->addSeparator();
+		auto const powerOnAct = new QAction(tr("Power &On"), this);
+		connect(powerOnAct, &QAction::triggered, &m_cameraClient, &CameraClient::powerOn);
+		menu->addAction(powerOnAct);
+		auto const powerOffAct = new QAction(tr("Power O&ff"), this);
+		connect(powerOffAct, &QAction::triggered, this, [this] {
+			auto const btn = QMessageBox::question(
+				this, tr("Power Off Camera"), tr("Are you sure you want to power off the camera?"));
+			if (btn == QMessageBox::Yes) {
+				m_cameraClient.powerOff();
+			}
+		});
+		menu->addAction(powerOffAct);
 		auto const rebootAct = new QAction(tr("&Reboot"), this);
 		connect(rebootAct, &QAction::triggered, this, [this] {
 			auto const btn = QMessageBox::question(
