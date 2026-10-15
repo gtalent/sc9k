@@ -26,6 +26,9 @@ class MainWindow: public QMainWindow {
 		bool m_cameraConnected = false;
 		bool m_openLpConnected = false;
 		bool m_obsConnected = false;
+		class QLabel *m_cameraStatus = nullptr;
+		class QLabel *m_openLpStatus = nullptr;
+		class QLabel *m_obsStatus = nullptr;
 		class QVBoxLayout *m_rootLyt = nullptr;
 		class QHBoxLayout *m_viewControlsParentLyt = nullptr;
 		class QWidget *m_viewControlsParent = nullptr;
@@ -55,6 +58,8 @@ class MainWindow: public QMainWindow {
 		void obsConnectionInit();
 
 		void obsConnectionLost();
+
+		class QLabel *addStatusIndicator(QString const &name);
 
 		void refreshStatusBar();
 

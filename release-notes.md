@@ -7,6 +7,7 @@
 * Add Qt install to Linux install script
 * Add uninstall script
 * Only enable OK and Apply buttons in settings dialog upon changes made
+* Replace connection status text in status bar with colored indicators
 
 # 1.1.0
 

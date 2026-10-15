@@ -8,14 +8,40 @@
 
 #include <QApplication>
 #include <QHBoxLayout>
+#include <QLabel>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QPainter>
 #include <QPushButton>
 #include <QStatusBar>
 
 #include "settingsdialog.hpp"
 #include "slideview.hpp"
 #include "mainwindow.hpp"
+
+namespace {
+
+QPixmap statusDot(QColor const &color) {
+	constexpr auto size = 10;
+	auto const dpr = qApp->devicePixelRatio();
+	QPixmap pixmap(static_cast<int>(size * dpr), static_cast<int>(size * dpr));
+	pixmap.setDevicePixelRatio(dpr);
+	pixmap.fill(Qt::transparent);
+	QPainter painter(&pixmap);
+	painter.setRenderHint(QPainter::Antialiasing);
+	painter.setPen(color.darker(150));
+	painter.setBrush(color);
+	painter.drawEllipse(QRectF(0.5, 0.5, size - 1, size - 1));
+	return pixmap;
+}
+
+void setStatusIndicator(QLabel *dot, QString const &name, bool connected) {
+	dot->setPixmap(statusDot(connected ? QColor(0x2e, 0xb8, 0x4b) : QColor(0xd9, 0x3a, 0x3a)));
+	dot->parentWidget()->setToolTip(
+		name + ": " + (connected ? MainWindow::tr("Connected") : MainWindow::tr("Not Connected")));
+}
+
+}
 
 MainWindow::MainWindow(QWidget *parent): QMainWindow(parent) {
 	move(0, 0);
@@ -65,6 +91,9 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent) {
 	connect(m_slideView, &SlideView::slideChanged, &m_openlpClient, &OpenLPClient::changeSlide);
 	// setup status bar
 	setStatusBar(new QStatusBar(this));
+	m_cameraStatus = addStatusIndicator(tr("Camera"));
+	m_openLpStatus = addStatusIndicator(tr("OpenLP"));
+	m_obsStatus = addStatusIndicator(tr("OBS"));
 	connect(&m_cameraClient, &CameraClient::pollUpdate, this, &MainWindow::cameraConnectionInit);
 	connect(&m_openlpClient, &OpenLPClient::songChanged, this, &MainWindow::refreshStatusBar);
 	connect(&m_openlpClient, &OpenLPClient::pollUpdate, this, &MainWindow::openLpConnectionInit);
@@ -250,11 +279,22 @@ void MainWindow::obsConnectionLost() {
 	refreshStatusBar();
 }
 
+QLabel *MainWindow::addStatusIndicator(QString const &name) {
+	auto const indicator = new QWidget(this);
+	auto const lyt = new QHBoxLayout(indicator);
+	lyt->setContentsMargins(4, 0, 4, 0);
+	lyt->setSpacing(4);
+	auto const dot = new QLabel(indicator);
+	lyt->addWidget(dot);
+	lyt->addWidget(new QLabel(name, indicator));
+	statusBar()->addPermanentWidget(indicator);
+	return dot;
+}
+
 void MainWindow::refreshStatusBar() {
-	auto const cameraStatus = m_cameraConnected ? tr("Camera: Connected") : tr("Camera: Not Connected");
-	auto const openLpStatus = m_openLpConnected ? tr("OpenLP: Connected") : tr("OpenLP: Not Connected");
-	auto const obsStatus = m_obsConnected ? tr("OBS: Connected") : tr("OBS: Not Connected");
+	setStatusIndicator(m_cameraStatus, tr("Camera"), m_cameraConnected);
+	setStatusIndicator(m_openLpStatus, tr("OpenLP"), m_openLpConnected);
+	setStatusIndicator(m_obsStatus, tr("OBS"), m_obsConnected);
 	auto const nextSong = m_openlpClient.getNextSong();
-	auto const nextSongTxt = m_openLpConnected ? " | Next Song: " + nextSong : "";
-	statusBar()->showMessage(cameraStatus + " | " + openLpStatus + " | " + obsStatus + nextSongTxt);
+	statusBar()->showMessage(m_openLpConnected ? tr("Next Song: ") + nextSong : QString{});
 }
