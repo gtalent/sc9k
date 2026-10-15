@@ -20,7 +20,7 @@ CameraClient::CameraClient(QObject *parent): QObject(parent), m_socket(new QUdpS
 	}
 	connect(m_socket, &QUdpSocket::readyRead, this, &CameraClient::onReadyRead);
 	connect(m_socket, &QUdpSocket::errorOccurred, this, &CameraClient::onSocketError);
-	setBaseUrl();
+	reloadConnectionSettings();
 	poll();
 	m_pollTimer.start(1000);
 	connect(&m_pollTimer, &QTimer::timeout, this, &CameraClient::poll);
@@ -72,7 +72,7 @@ void CameraClient::reboot() {
 	emit pollFailed();
 }
 
-void CameraClient::setBaseUrl() {
+void CameraClient::reloadConnectionSettings() {
 	auto const [host, port] = getCameraConnectionData();
 	m_host = host;
 	m_port = port;

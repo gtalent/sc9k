@@ -38,7 +38,7 @@ OpenLPClient::OpenLPClient(QObject *parent): QObject(parent) {
 	m_pingTimer.setInterval(5000);
 	m_reconnectTimer.setInterval(2000);
 	m_reconnectTimer.start();
-	setBaseUrl();
+	reloadConnectionSettings();
 }
 
 QString OpenLPClient::getNextSong() {
@@ -93,7 +93,7 @@ void OpenLPClient::changeSlide(int const slide) {
 	post("/api/v2/controller/show", QString(R"({"id":%1})").arg(slide));
 }
 
-void OpenLPClient::setBaseUrl() {
+void OpenLPClient::reloadConnectionSettings() {
 	auto const [host, port] = getOpenLPConnectionData();
 	if (m_host == host && m_httpPort == port) {
 		return;

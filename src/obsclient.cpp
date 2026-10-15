@@ -19,7 +19,7 @@ OBSClient::OBSClient(QObject *parent): QObject(parent), m_socket(new QTcpSocket(
 	connect(m_socket, &QTcpSocket::disconnected, this, &OBSClient::onDisconnected);
 	connect(m_socket, &QTcpSocket::readyRead, this, &OBSClient::onReadyRead);
 	connect(m_socket, &QTcpSocket::errorOccurred, this, &OBSClient::onErrorOccurred);
-	setBaseUrl();
+	reloadConnectionSettings();
 	m_pollTimer.start(1000);
 	connect(&m_pollTimer, &QTimer::timeout, this, &OBSClient::poll);
 }
@@ -55,7 +55,7 @@ void OBSClient::setSlidesVisible(bool const state) {
 	}
 }
 
-void OBSClient::setBaseUrl() {
+void OBSClient::reloadConnectionSettings() {
 	auto const [host, port, password] = getOBSConnectionData();
 	bool const changed = (m_host != host || m_port != port || m_password != password);
 	m_host = host;

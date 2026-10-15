@@ -47,7 +47,7 @@ class OBSClient: public QObject {
 		void showSlides();
 		void hideSlides();
 		void setSlidesVisible(bool state);
-		void setBaseUrl();
+		void reloadConnectionSettings();
 
 	private slots:
 		void onConnected();

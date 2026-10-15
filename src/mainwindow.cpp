@@ -252,9 +252,9 @@ void MainWindow::openSettings() {
 	connect(&d, &SettingsDialog::previewPreset, &m_cameraClient, &CameraClient::setPresetVC);
 	// apply on Apply as well as OK, since Apply disables OK and leaves only Cancel to close the dialog
 	connect(&d, &SettingsDialog::settingsApplied, this, [this] {
-		m_cameraClient.setBaseUrl();
-		m_obsClient.setBaseUrl();
-		m_openlpClient.setBaseUrl();
+		m_cameraClient.reloadConnectionSettings();
+		m_obsClient.reloadConnectionSettings();
+		m_openlpClient.reloadConnectionSettings();
 		setupViewControls(m_rootLyt);
 	});
 	d.exec();

@@ -71,7 +71,7 @@ class OpenLPClient: public QObject {
 
 		void changeSlide(int slide);
 
-		void setBaseUrl();
+		void reloadConnectionSettings();
 
 	private:
 		void post(QString const &urlExt, QString const &data);

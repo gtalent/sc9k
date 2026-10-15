@@ -53,7 +53,7 @@ class CameraClient: public QObject {
 		void reboot();
 
 	public slots:
-		void setBaseUrl();
+		void reloadConnectionSettings();
 
 	private:
 		void setBrightness(int val);
