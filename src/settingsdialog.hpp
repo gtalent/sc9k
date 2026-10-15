@@ -18,6 +18,8 @@ class SettingsDialog: public QDialog {
 	private:
 		QVector<VideoConfig> m_videoConfig = QVector<VideoConfig>(MaxCameraPresets);
 		class QLabel *m_errLbl = nullptr;
+		class QPushButton *m_okBtn = nullptr;
+		class QPushButton *m_applyBtn = nullptr;
 		class QLineEdit *m_cameraHostLe = nullptr;
 		class QLineEdit *m_cameraPortLe = nullptr;
 		class QLineEdit *m_openLpHostLe = nullptr;
@@ -42,6 +44,7 @@ class SettingsDialog: public QDialog {
         [[nodiscard]]
         int handleApply();
 		void handleOK();
+		void setDirty(bool dirty);
 		void setupViewRow(int row, View const &view = {});
 		/**
 		 * Gets views from table.

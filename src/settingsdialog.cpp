@@ -15,6 +15,7 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QSettings>
+#include <QSignalBlocker>
 #include <QSpacerItem>
 #include <QSpinBox>
 #include <QTabWidget>
@@ -85,6 +86,12 @@ QWidget *SettingsDialog::setupNetworkInputs(QWidget *parent) {
 		lyt->addRow(tr("OB&S Port:"), m_obsPortLe);
 		lyt->addRow(tr("OBS &Password:"), m_obsPasswordLe);
 	}
+	for (auto const le : {
+			m_cameraHostLe, m_cameraPortLe,
+			m_openLpHostLe, m_openLpPortLe,
+			m_obsHostLe, m_obsPortLe, m_obsPasswordLe}) {
+		connect(le, &QLineEdit::textEdited, this, [this] { setDirty(true); });
+	}
 	return root;
 }
 
@@ -96,11 +103,12 @@ QWidget *SettingsDialog::setupImageConfig(QWidget *parent) {
 		auto const formLyt = new QFormLayout(formRoot);
 		lyt->addWidget(formRoot);
 		m_videoConfig = getVideoConfig();
-		auto const mkSb = [parent, formLyt](QString const &lbl) {
+		auto const mkSb = [this, parent, formLyt](QString const &lbl) {
 			auto const s = new QSpinBox(parent);
 			s->setAlignment(Qt::AlignRight);
 			s->setRange(0, 14);
 			formLyt->addRow(lbl, s);
+			connect(s, &QSpinBox::valueChanged, this, [this] { setDirty(true); });
 			return s;
 		};
 		auto const presetNo = new QComboBox(parent);
@@ -171,11 +179,13 @@ QWidget *SettingsDialog::setupViewConfig(QWidget *parent) {
 			m_viewTable->setRowCount(row + 1);
 			setupViewRow(row);
 			addBtn->setEnabled(m_viewTable->rowCount() < MaxViews);
+			setDirty(true);
 		});
 		connect(rmBtn, &QPushButton::clicked, this, [this, addBtn] {
 			auto const row = m_viewTable->currentRow();
 			m_viewTable->removeRow(row);
 			addBtn->setEnabled(m_viewTable->rowCount() < MaxViews);
+			setDirty(true);
 		});
 		connect(m_viewTable, &QTableWidget::currentCellChanged, rmBtn, [this, addBtn, rmBtn] (int row) {
 			rmBtn->setEnabled(row > -1 && row < m_viewTable->rowCount());
@@ -187,6 +197,8 @@ QWidget *SettingsDialog::setupViewConfig(QWidget *parent) {
 			setupViewRow(row, view);
 			++row;
 		}
+		// connect after populating so the initial load doesn't count as a change
+		connect(m_viewTable, &QTableWidget::itemChanged, this, [this] { setDirty(true); });
 	}
 	return root;
 }
@@ -195,18 +207,28 @@ QWidget *SettingsDialog::setupButtons(QWidget *parent) {
 	auto const root = new QWidget(parent);
 	auto const lyt = new QHBoxLayout(root);
 	m_errLbl = new QLabel(root);
-	auto const okBtn = new QPushButton(tr("&OK"), root);
-	auto const applyBtn = new QPushButton(tr("&Apply"), root);
+	m_okBtn = new QPushButton(tr("&OK"), root);
+	m_applyBtn = new QPushButton(tr("&Apply"), root);
 	auto const cancelBtn = new QPushButton(tr("&Cancel"), root);
 	lyt->addWidget(m_errLbl);
 	lyt->addSpacerItem(new QSpacerItem(1000, 0, QSizePolicy::Expanding, QSizePolicy::Ignored));
-	lyt->addWidget(okBtn);
-	lyt->addWidget(applyBtn);
+	lyt->addWidget(m_okBtn);
+	lyt->addWidget(m_applyBtn);
 	lyt->addWidget(cancelBtn);
-	connect(okBtn, &QPushButton::clicked, this, &SettingsDialog::handleOK);
-	connect(applyBtn, &QPushButton::clicked, this, &SettingsDialog::handleApply);
+	connect(m_okBtn, &QPushButton::clicked, this, &SettingsDialog::handleOK);
+	connect(m_applyBtn, &QPushButton::clicked, this, &SettingsDialog::handleApply);
 	connect(cancelBtn, &QPushButton::clicked, this, &SettingsDialog::reject);
+	setDirty(false);
 	return root;
+}
+
+void SettingsDialog::setDirty(bool const dirty) {
+	if (m_okBtn) {
+		m_okBtn->setEnabled(dirty);
+	}
+	if (m_applyBtn) {
+		m_applyBtn->setEnabled(dirty);
+	}
 }
 
 int SettingsDialog::handleApply() {
@@ -232,6 +254,7 @@ int SettingsDialog::handleApply() {
 	});
 	collectVideoConfig();
 	setVideoConfig(settings, m_videoConfig);
+	setDirty(false);
     return 0;
 }
 
@@ -241,17 +264,19 @@ void SettingsDialog::handleOK() {
     }
 }
 
-void SettingsDialog::setupViewRow(int row, View const &view) {
+void SettingsDialog::setupViewRow(int const row, View const &view) {
 	// name
 	auto const nameItem = new QTableWidgetItem(view.name);
 	m_viewTable->setItem(row, ViewColumn::Name, nameItem);
 	// slides
 	auto const slidesCb = new QCheckBox(m_viewTable);
 	slidesCb->setChecked(view.slides);
+	connect(slidesCb, &QCheckBox::toggled, this, [this] { setDirty(true); });
 	m_viewTable->setCellWidget(row, ViewColumn::Slides, slidesCb);
 	// obs slides
 	auto const obsSlidesCb = new QCheckBox(m_viewTable);
 	obsSlidesCb->setChecked(view.obsSlides);
+	connect(obsSlidesCb, &QCheckBox::toggled, this, [this] { setDirty(true); });
 	m_viewTable->setCellWidget(row, ViewColumn::ObsSlides, obsSlidesCb);
 	// camera preset
 	auto const presetItem = new QTableWidgetItem(QString::number(view.cameraPreset));
@@ -296,10 +321,12 @@ void SettingsDialog::collectVideoConfig() {
 	getVal(vc.hue, m_vidHue);
 }
 
-void SettingsDialog::updateVidConfigPreset(int preset) {
+void SettingsDialog::updateVidConfigPreset(int const preset) {
 	// update to new value
 	auto constexpr setVal = [](int val, QSpinBox *dst) {
 		if (dst) {
+			// switching presets isn't a change to the settings
+			QSignalBlocker const blocker(dst);
 			dst->setValue(val);
 		}
 	};
@@ -312,7 +339,7 @@ void SettingsDialog::updateVidConfigPreset(int preset) {
 	m_vidCurrentPreset = preset;
 }
 
-void SettingsDialog::updateVidConfigPresetCollect(int preset) {
+void SettingsDialog::updateVidConfigPresetCollect(int const preset) {
 	collectVideoConfig();
 	updateVidConfigPreset(preset);
 }
