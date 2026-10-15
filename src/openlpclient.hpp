@@ -37,6 +37,8 @@ class OpenLPClient: public QObject {
 		// service item ID -> title
 		QHash<QString, QString> m_songNameMap;
 		QStringList m_songList;
+		// service item IDs, in the same order as m_songList
+		QStringList m_songIdList;
 		QStringList m_currentSlideList;
 		QStringList m_currentTagList;
 		int m_currentServiceId = -1;

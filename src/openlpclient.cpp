@@ -82,7 +82,11 @@ void OpenLPClient::setSlidesVisible(bool const value) {
 }
 
 void OpenLPClient::changeSong(int const it) {
-	post("/api/v2/service/show", QString(R"({"id":%1})").arg(it));
+	// OpenLP treats an index of 0 as a missing ID, so select by the item's UUID
+	if (it < 0 || it >= m_songIdList.size()) {
+		return;
+	}
+	post("/api/v2/service/show", QString(R"({"id":"%1"})").arg(m_songIdList[it]));
 }
 
 void OpenLPClient::changeSlide(int const slide) {
@@ -123,13 +127,17 @@ void OpenLPClient::requestSongList() {
 		}
 		QHash<QString, QString> songNameMap;
 		QStringList songList;
+		QStringList songIdList;
 		for (auto const &item : QJsonDocument::fromJson(reply->readAll()).array()) {
 			auto const song = item.toObject();
+			auto const id = song["id"].toString();
 			auto const title = song["title"].toString();
-			songNameMap[song["id"].toString()] = title;
+			songNameMap[id] = title;
 			songList.push_back(title);
+			songIdList.push_back(id);
 		}
 		m_songNameMap = std::move(songNameMap);
+		m_songIdList = std::move(songIdList);
 		m_currentSongTitle = m_songNameMap.value(m_currentSongId, m_currentSongTitle);
 		if (m_songList != songList) {
 			m_songList = std::move(songList);
@@ -185,6 +193,7 @@ void OpenLPClient::resetState() {
 	m_currentTagList.clear();
 	m_songNameMap.clear();
 	m_songList.clear();
+	m_songIdList.clear();
 }
 
 void OpenLPClient::emitUpdate() {
