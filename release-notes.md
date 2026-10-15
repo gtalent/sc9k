@@ -8,6 +8,7 @@
 * Add uninstall script
 * Only enable OK and Apply buttons in settings dialog upon changes made
 * Replace connection status text in status bar with colored indicators
+* Fix settings saved with Apply not taking effect until restart if the settings dialog was then closed with Cancel
 
 # 1.1.0
 

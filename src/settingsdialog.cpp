@@ -255,6 +255,7 @@ int SettingsDialog::handleApply() {
 	collectVideoConfig();
 	setVideoConfig(settings, m_videoConfig);
 	setDirty(false);
+	emit settingsApplied();
     return 0;
 }
 

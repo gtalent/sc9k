@@ -228,13 +228,14 @@ void MainWindow::setupViewControls(QVBoxLayout *rootLyt) {
 void MainWindow::openSettings() {
 	SettingsDialog d(this);
 	connect(&d, &SettingsDialog::previewPreset, &m_cameraClient, &CameraClient::setPresetVC);
-	auto const result = d.exec();
-	if (result == QDialog::Accepted) {
+	// apply on Apply as well as OK, since Apply disables OK and leaves only Cancel to close the dialog
+	connect(&d, &SettingsDialog::settingsApplied, this, [this] {
 		m_cameraClient.setBaseUrl();
 		m_obsClient.setBaseUrl();
 		m_openlpClient.setBaseUrl();
 		setupViewControls(m_rootLyt);
-	}
+	});
+	d.exec();
 }
 
 void MainWindow::cameraConnectionInit() {
