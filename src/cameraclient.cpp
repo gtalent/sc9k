@@ -13,7 +13,11 @@
 #include "settingsdata.hpp"
 
 CameraClient::CameraClient(QObject *parent): QObject(parent), m_socket(new QUdpSocket(this)) {
-	m_socket->bind(QHostAddress::AnyIPv4, 0);
+	// some cameras send replies to the VISCA port rather than the sender's port,
+	// so listen on it if possible to receive poll responses
+	if (!m_socket->bind(QHostAddress::AnyIPv4, 52381)) {
+		m_socket->bind(QHostAddress::AnyIPv4, 0);
+	}
 	connect(m_socket, &QUdpSocket::readyRead, this, &CameraClient::onReadyRead);
 	connect(m_socket, &QUdpSocket::errorOccurred, this, &CameraClient::onSocketError);
 	setBaseUrl();
