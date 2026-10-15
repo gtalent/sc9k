@@ -249,7 +249,10 @@ void MainWindow::setupViewControls(QVBoxLayout *rootLyt) {
 
 void MainWindow::openSettings() {
 	SettingsDialog d(this);
-	connect(&d, &SettingsDialog::previewPreset, &m_cameraClient, &CameraClient::setPresetVC);
+	connect(&d, &SettingsDialog::previewPreset, &m_cameraClient, &CameraClient::applyPreset);
+	connect(&d, &SettingsDialog::requestPtzPosition, &m_cameraClient, &CameraClient::queryPtzPosition);
+	connect(&m_cameraClient, &CameraClient::ptzPositionReceived, &d, &SettingsDialog::setPtzPosition);
+	connect(&m_cameraClient, &CameraClient::ptzPositionQueryFailed, &d, &SettingsDialog::ptzPositionQueryFailed);
 	// apply on Apply as well as OK, since Apply disables OK and leaves only Cancel to close the dialog
 	connect(&d, &SettingsDialog::settingsApplied, this, [this] {
 		m_cameraClient.reloadConnectionSettings();

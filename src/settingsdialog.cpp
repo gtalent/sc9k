@@ -9,6 +9,7 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QFormLayout>
+#include <QGroupBox>
 #include <QHeaderView>
 #include <QIntValidator>
 #include <QLabel>
@@ -38,10 +39,10 @@ SettingsDialog::SettingsDialog(QWidget *parent): QDialog(parent) {
 	auto const tabs = new QTabWidget(this);
 	lyt->addWidget(tabs);
 	tabs->addTab(setupViewConfig(tabs), tr("&Views"));
-	tabs->addTab(setupImageConfig(tabs), tr("&Image"));
+	tabs->addTab(setupCameraPresetConfig(tabs), tr("Ca&mera Presets"));
 	tabs->addTab(setupNetworkInputs(tabs), tr("&Network"));
 	lyt->addWidget(setupButtons(this));
-	setFixedSize(440, 440);
+	setFixedSize(480, 540);
 }
 
 QWidget *SettingsDialog::setupNetworkInputs(QWidget *parent) {
@@ -95,49 +96,115 @@ QWidget *SettingsDialog::setupNetworkInputs(QWidget *parent) {
 	return root;
 }
 
-QWidget *SettingsDialog::setupImageConfig(QWidget *parent) {
+QWidget *SettingsDialog::setupCameraPresetConfig(QWidget *parent) {
 	auto const root = new QWidget(parent);
 	auto const lyt = new QVBoxLayout(root);
+	m_cameraPresets = getCameraPresets();
+	auto const mkSb = [this](QWidget *parent, QFormLayout *formLyt, QString const &lbl, int min, int max) {
+		auto const s = new QSpinBox(parent);
+		s->setAlignment(Qt::AlignRight);
+		s->setRange(min, max);
+		formLyt->addRow(lbl, s);
+		connect(s, &QSpinBox::valueChanged, this, [this] { setDirty(true); });
+		return s;
+	};
+	auto constexpr mkForm = [](QWidget *parent) {
+		auto const formLyt = new QFormLayout(parent);
+		// size hints vary with spin box range, so stretch fields for consistent widths
+		formLyt->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+		return formLyt;
+	};
+	auto const presetNo = new QComboBox(root);
+	lyt->addWidget(presetNo);
 	{
-		auto const formRoot = new QWidget(parent);
-		auto const formLyt = new QFormLayout(formRoot);
-		lyt->addWidget(formRoot);
-		m_videoConfig = getVideoConfig();
-		auto const mkSb = [this, parent, formLyt](QString const &lbl) {
-			auto const s = new QSpinBox(parent);
-			s->setAlignment(Qt::AlignRight);
-			s->setRange(0, 14);
-			formLyt->addRow(lbl, s);
-			connect(s, &QSpinBox::valueChanged, this, [this] { setDirty(true); });
-			return s;
-		};
-		auto const presetNo = new QComboBox(parent);
-		connect(presetNo, &QComboBox::currentIndexChanged, this, &SettingsDialog::updateVidConfigPreset);
-		for (auto i = 0; i < MaxCameraPresets; ++i) {
-			presetNo->addItem(tr("Camera Preset %1").arg(i + 1));
+		auto const presetRoot = new QWidget(root);
+		auto const presetLyt = new QHBoxLayout(presetRoot);
+		presetLyt->setContentsMargins(0, 0, 0, 0);
+		lyt->addWidget(presetRoot);
+		// image
+		{
+			auto const grp = new QGroupBox(tr("Image"), presetRoot);
+			auto const formLyt = mkForm(grp);
+			presetLyt->addWidget(grp);
+			m_vidBrightness = mkSb(grp, formLyt, tr("&Brightness:"), 0, 14);
+			m_vidSaturation = mkSb(grp, formLyt, tr("&Saturation:"), 0, 14);
+			m_vidContrast = mkSb(grp, formLyt, tr("Con&trast:"), 0, 14);
+			m_vidSharpness = mkSb(grp, formLyt, tr("Sharpn&ess:"), 0, 14);
+			m_vidHue = mkSb(grp, formLyt, tr("&Hue:"), 0, 14);
 		}
-		formLyt->addRow(presetNo);
-		m_vidBrightness = mkSb(tr("&Brightness:"));
-		m_vidSaturation = mkSb(tr("&Saturation:"));
-		m_vidContrast = mkSb(tr("Con&trast:"));
-		m_vidSharpness = mkSb(tr("Sharpn&ess:"));
-		m_vidHue = mkSb(tr("&Hue:"));
-		updateVidConfigPreset(0);
+		// position
+		{
+			auto const grp = new QGroupBox(tr("Position"), presetRoot);
+			auto const formLyt = mkForm(grp);
+			presetLyt->addWidget(grp);
+			m_usePtz = new QCheckBox(tr("&Use PTZ"), grp);
+			m_usePtz->setToolTip(tr("When off, the camera's own stored preset is recalled"));
+			formLyt->addRow(m_usePtz);
+			connect(m_usePtz, &QCheckBox::toggled, this, [this] {
+				updatePtzEnabled();
+				setDirty(true);
+			});
+			// 5 nibble pan on some cameras, 4 nibble tilt and zoom
+			m_pan = mkSb(grp, formLyt, tr("Pan:"), -0x80000, 0x7FFFF);
+			m_tilt = mkSb(grp, formLyt, tr("T&ilt:"), -0x8000, 0x7FFF);
+			m_zoom = mkSb(grp, formLyt, tr("&Zoom:"), 0, 0xFFFF);
+			m_getPtzBtn = new QPushButton(tr("&Get Current"), grp);
+			m_getPtzBtn->setToolTip(tr("Fill in the camera's current position"));
+			formLyt->addRow(m_getPtzBtn);
+			connect(m_getPtzBtn, &QPushButton::clicked, this, [this] {
+				m_getPtzBtn->setEnabled(false);
+				m_errLbl->clear();
+				emit requestPtzPosition();
+			});
+		}
+	}
+	for (auto i = 0; i < MaxCameraPresets; ++i) {
+		presetNo->addItem(tr("Camera Preset %1").arg(i + 1));
+	}
+	updateCameraPreset(0);
+	// connect after populating, otherwise the initial selection would collect the empty fields
+	connect(presetNo, &QComboBox::currentIndexChanged, this, &SettingsDialog::updateCameraPresetCollect);
+	// transition speed, shared by all presets
+	{
+		auto const grp = new QGroupBox(tr("Transition Speed"), root);
+		auto const formLyt = mkForm(grp);
+		lyt->addWidget(grp);
+		auto const speed = getPtzSpeed();
+		m_panTiltSpeed = mkSb(grp, formLyt, tr("Pan/Tilt Spee&d:"), 1, 24);
+		m_zoomSpeed = mkSb(grp, formLyt, tr("Zoom Speed:"), 0, 8);
+		m_zoomSpeed->setSpecialValueText(tr("Camera Default"));
+		QSignalBlocker const ptBlocker(m_panTiltSpeed);
+		QSignalBlocker const zBlocker(m_zoomSpeed);
+		m_panTiltSpeed->setValue(speed.panTilt);
+		m_zoomSpeed->setValue(speed.zoom);
 	}
 	{
-		auto const btnRoot = new QWidget(parent);
+		auto const btnRoot = new QWidget(root);
 		auto const btnLyt = new QHBoxLayout(btnRoot);
 		lyt->addWidget(btnRoot);
 		btnLyt->setAlignment(Qt::AlignRight);
 		auto const previewBtn = new QPushButton(tr("&Preview"), btnRoot);
 		btnLyt->addWidget(previewBtn);
 		connect(previewBtn, &QPushButton::clicked, this, [this] {
-			this->collectVideoConfig();
-			auto const &vc = m_videoConfig[m_vidCurrentPreset];
-			emit previewPreset(m_vidCurrentPreset + 1, vc);
+			this->collectCameraPreset();
+			auto const &cp = m_cameraPresets[m_vidCurrentPreset];
+			emit previewPreset(m_vidCurrentPreset + 1, cp);
 		});
 	}
 	return root;
+}
+
+void SettingsDialog::setPtzPosition(int const pan, int const tilt, int const zoom) {
+	m_getPtzBtn->setEnabled(true);
+	m_usePtz->setChecked(true);
+	m_pan->setValue(pan);
+	m_tilt->setValue(tilt);
+	m_zoom->setValue(zoom);
+}
+
+void SettingsDialog::ptzPositionQueryFailed() {
+	m_getPtzBtn->setEnabled(true);
+	m_errLbl->setText(tr("Camera did not report its position."));
 }
 
 QWidget *SettingsDialog::setupViewConfig(QWidget *parent) {
@@ -252,8 +319,12 @@ int SettingsDialog::handleApply() {
 		.port = m_obsPortLe->text().toUShort(),
 		.password = m_obsPasswordLe->text(),
 	});
-	collectVideoConfig();
-	setVideoConfig(settings, m_videoConfig);
+	collectCameraPreset();
+	setCameraPresets(settings, m_cameraPresets);
+	setPtzSpeed(settings, {
+		.panTilt = m_panTiltSpeed->value(),
+		.zoom = m_zoomSpeed->value(),
+	});
 	setDirty(false);
 	emit settingsApplied();
     return 0;
@@ -308,21 +379,27 @@ int SettingsDialog::collectViews(QVector<View> &views) const {
 	return 0;
 }
 
-void SettingsDialog::collectVideoConfig() {
-	auto &vc = m_videoConfig[m_vidCurrentPreset];
+void SettingsDialog::collectCameraPreset() {
+	auto &cp = m_cameraPresets[m_vidCurrentPreset];
 	auto constexpr getVal = [](int &val, QSpinBox *src) {
 		if (src) {
 			val = src->value();
 		}
 	};
-	getVal(vc.brightness, m_vidBrightness);
-	getVal(vc.saturation, m_vidSaturation);
-	getVal(vc.contrast, m_vidContrast);
-	getVal(vc.sharpness, m_vidSharpness);
-	getVal(vc.hue, m_vidHue);
+	getVal(cp.brightness, m_vidBrightness);
+	getVal(cp.saturation, m_vidSaturation);
+	getVal(cp.contrast, m_vidContrast);
+	getVal(cp.sharpness, m_vidSharpness);
+	getVal(cp.hue, m_vidHue);
+	if (m_usePtz) {
+		cp.usePtz = m_usePtz->isChecked();
+	}
+	getVal(cp.pan, m_pan);
+	getVal(cp.tilt, m_tilt);
+	getVal(cp.zoom, m_zoom);
 }
 
-void SettingsDialog::updateVidConfigPreset(int const preset) {
+void SettingsDialog::updateCameraPreset(int const preset) {
 	// update to new value
 	auto constexpr setVal = [](int val, QSpinBox *dst) {
 		if (dst) {
@@ -331,16 +408,33 @@ void SettingsDialog::updateVidConfigPreset(int const preset) {
 			dst->setValue(val);
 		}
 	};
-	auto const &vc = m_videoConfig[preset];
-	setVal(vc.brightness, m_vidBrightness);
-	setVal(vc.saturation, m_vidSaturation);
-	setVal(vc.contrast, m_vidContrast);
-	setVal(vc.sharpness, m_vidSharpness);
-	setVal(vc.hue, m_vidHue);
+	auto const &cp = m_cameraPresets[preset];
+	setVal(cp.brightness, m_vidBrightness);
+	setVal(cp.saturation, m_vidSaturation);
+	setVal(cp.contrast, m_vidContrast);
+	setVal(cp.sharpness, m_vidSharpness);
+	setVal(cp.hue, m_vidHue);
+	if (m_usePtz) {
+		QSignalBlocker const blocker(m_usePtz);
+		m_usePtz->setChecked(cp.usePtz);
+	}
+	setVal(cp.pan, m_pan);
+	setVal(cp.tilt, m_tilt);
+	setVal(cp.zoom, m_zoom);
+	updatePtzEnabled();
 	m_vidCurrentPreset = preset;
 }
 
-void SettingsDialog::updateVidConfigPresetCollect(int const preset) {
-	collectVideoConfig();
-	updateVidConfigPreset(preset);
+void SettingsDialog::updateCameraPresetCollect(int const preset) {
+	collectCameraPreset();
+	updateCameraPreset(preset);
+}
+
+void SettingsDialog::updatePtzEnabled() {
+	auto const enabled = m_usePtz && m_usePtz->isChecked();
+	for (auto const sb : {m_pan, m_tilt, m_zoom}) {
+		if (sb) {
+			sb->setEnabled(enabled);
+		}
+	}
 }

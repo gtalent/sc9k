@@ -1,4 +1,8 @@
 
+# 1.3.0
+
+* Add support for an app defined camera preset system with more natural transitions
+
 # 1.2.0
 
 * Replace connection status text in status bar with colored indicators

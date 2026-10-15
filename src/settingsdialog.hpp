@@ -16,7 +16,7 @@
 class SettingsDialog: public QDialog {
 	Q_OBJECT
 	private:
-		QVector<VideoConfig> m_videoConfig = QVector<VideoConfig>(MaxCameraPresets);
+		QVector<CameraPreset> m_cameraPresets = QVector<CameraPreset>(MaxCameraPresets);
 		class QLabel *m_errLbl = nullptr;
 		class QPushButton *m_okBtn = nullptr;
 		class QPushButton *m_applyBtn = nullptr;
@@ -32,14 +32,25 @@ class SettingsDialog: public QDialog {
 		class QSpinBox *m_vidContrast = nullptr;
 		class QSpinBox *m_vidSharpness = nullptr;
 		class QSpinBox *m_vidHue = nullptr;
+		class QCheckBox *m_usePtz = nullptr;
+		class QSpinBox *m_pan = nullptr;
+		class QSpinBox *m_tilt = nullptr;
+		class QSpinBox *m_zoom = nullptr;
+		class QPushButton *m_getPtzBtn = nullptr;
+		class QSpinBox *m_panTiltSpeed = nullptr;
+		class QSpinBox *m_zoomSpeed = nullptr;
 		int m_vidCurrentPreset = 0;
 		class QTableWidget *m_viewTable = nullptr;
 	public:
 		explicit SettingsDialog(QWidget *parent);
+
+		void setPtzPosition(int pan, int tilt, int zoom);
+
+		void ptzPositionQueryFailed();
 	private:
 		QWidget *setupNetworkInputs(QWidget *parent);
 		QWidget *setupViewConfig(QWidget *parent);
-		QWidget *setupImageConfig(QWidget *parent);
+		QWidget *setupCameraPresetConfig(QWidget *parent);
 		QWidget *setupButtons(QWidget *parent);
         [[nodiscard]]
         int handleApply();
@@ -52,11 +63,14 @@ class SettingsDialog: public QDialog {
 		 */
 		[[nodiscard("Must check error code")]]
 		int collectViews(QVector<View> &views) const;
-		void collectVideoConfig();
-		void updateVidConfigPreset(int preset);
-		void updateVidConfigPresetCollect(int preset);
+		void collectCameraPreset();
+		void updateCameraPreset(int preset);
+		void updateCameraPresetCollect(int preset);
+		void updatePtzEnabled();
 	signals:
-		void previewPreset(int, VideoConfig const&);
+		void previewPreset(int, CameraPreset const&);
+
+		void requestPtzPosition();
 
 		void settingsApplied();
 };

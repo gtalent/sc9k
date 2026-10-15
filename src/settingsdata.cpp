@@ -11,49 +11,80 @@
 #include "consts.hpp"
 #include "settingsdata.hpp"
 
-void setVideoConfig(QSettings &settings, QVector<VideoConfig> const &vcList) {
+void setCameraPresets(QSettings &settings, QVector<CameraPreset> const &presets) {
 	settings.beginGroup("Camera");
+	// key predates PTZ support, keep it to preserve existing settings
 	settings.beginWriteArray("VideoImageConfig");
-	for (auto i = 0; auto const &vc : vcList) {
+	for (auto i = 0; auto const &p : presets) {
 		settings.setArrayIndex(i);
-		settings.setValue("brightness", vc.brightness);
-		settings.setValue("saturation", vc.saturation);
-		settings.setValue("contrast", vc.contrast);
-		settings.setValue("sharpness", vc.sharpness);
-		settings.setValue("hue", vc.hue);
+		settings.setValue("brightness", p.brightness);
+		settings.setValue("saturation", p.saturation);
+		settings.setValue("contrast", p.contrast);
+		settings.setValue("sharpness", p.sharpness);
+		settings.setValue("hue", p.hue);
+		settings.setValue("usePtz", p.usePtz);
+		settings.setValue("pan", p.pan);
+		settings.setValue("tilt", p.tilt);
+		settings.setValue("zoom", p.zoom);
 		++i;
 	}
 	settings.endArray();
 	settings.endGroup();
 }
 
-void setVideoConfig(QVector<VideoConfig> const &vcList) {
+void setCameraPresets(QVector<CameraPreset> const &presets) {
 	QSettings s;
-	setVideoConfig(s, vcList);
+	setCameraPresets(s, presets);
 }
 
-QVector<VideoConfig> getVideoConfig(QSettings &settings) {
-	QVector<VideoConfig> vc(MaxCameraPresets);
+QVector<CameraPreset> getCameraPresets(QSettings &settings) {
+	QVector<CameraPreset> presets(MaxCameraPresets);
 	settings.beginGroup("Camera");
 	auto const size = std::min(settings.beginReadArray("VideoImageConfig"), MaxCameraPresets);
 	for (auto i = 0; i < size; ++i) {
 		settings.setArrayIndex(i);
-		vc[i] = {
+		presets[i] = {
 			.brightness = settings.value("brightness").toInt(),
 			.saturation = settings.value("saturation").toInt(),
 			.contrast = settings.value("contrast").toInt(),
 			.sharpness = settings.value("sharpness").toInt(),
 			.hue = settings.value("hue").toInt(),
+			.usePtz = settings.value("usePtz", false).toBool(),
+			.pan = settings.value("pan", 0).toInt(),
+			.tilt = settings.value("tilt", 0).toInt(),
+			.zoom = settings.value("zoom", 0).toInt(),
 		};
 	}
 	settings.endArray();
 	settings.endGroup();
-	return vc;
+	return presets;
 }
 
-QVector<VideoConfig> getVideoConfig() {
+QVector<CameraPreset> getCameraPresets() {
 	QSettings s;
-	return getVideoConfig(s);
+	return getCameraPresets(s);
+}
+
+void setPtzSpeed(QSettings &settings, PtzSpeed const &speed) {
+	settings.beginGroup("Camera");
+	settings.setValue("PanTiltSpeed", speed.panTilt);
+	settings.setValue("ZoomSpeed", speed.zoom);
+	settings.endGroup();
+}
+
+PtzSpeed getPtzSpeed(QSettings &settings) {
+	PtzSpeed const defaults;
+	PtzSpeed out;
+	settings.beginGroup("Camera");
+	out.panTilt = settings.value("PanTiltSpeed", defaults.panTilt).toInt();
+	out.zoom = settings.value("ZoomSpeed", defaults.zoom).toInt();
+	settings.endGroup();
+	return out;
+}
+
+PtzSpeed getPtzSpeed() {
+	QSettings s;
+	return getPtzSpeed(s);
 }
 
 void setCameraConnectionData(QSettings &settings, ConnectionData const &cd) {

@@ -12,21 +12,41 @@
 #include <QString>
 #include <QVector>
 
-struct VideoConfig {
+struct CameraPreset {
 	int brightness = 6;
 	int saturation = 4;
 	int contrast = 8;
 	int sharpness = 3;
 	int hue = 7;
+	// when false, the camera's own stored preset is recalled instead
+	bool usePtz = false;
+	int pan = 0;
+	int tilt = 0;
+	int zoom = 0;
 };
 
-void setVideoConfig(class QSettings &settings, QVector<VideoConfig> const &vc);
+void setCameraPresets(class QSettings &settings, QVector<CameraPreset> const &presets);
 
-void setVideoConfig(QVector<VideoConfig> const &vc);
+void setCameraPresets(QVector<CameraPreset> const &presets);
 
-QVector<VideoConfig> getVideoConfig(class QSettings &settings);
+QVector<CameraPreset> getCameraPresets(class QSettings &settings);
 
-QVector<VideoConfig> getVideoConfig();
+QVector<CameraPreset> getCameraPresets();
+
+struct PtzSpeed {
+	// VISCA pan/tilt speed, 1-24
+	int panTilt = 12;
+	// 0 uses the camera's default zoom speed, 1-8 uses variable speed zoom
+	int zoom = 0;
+};
+
+void setPtzSpeed(class QSettings &settings, PtzSpeed const &speed);
+
+[[nodiscard]]
+PtzSpeed getPtzSpeed(class QSettings &settings);
+
+[[nodiscard]]
+PtzSpeed getPtzSpeed();
 
 struct ConnectionData {
 	QString host;

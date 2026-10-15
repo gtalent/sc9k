@@ -12,6 +12,45 @@
 #include "consts.hpp"
 #include "settingsdata.hpp"
 
+namespace {
+
+constexpr auto PtzTickMs = 150;
+// how long to wait for the starting position before moving everything at once
+constexpr auto LocateTimeoutMs = 1500;
+constexpr auto StepTimeoutMs = 20000;
+// camera may not have started moving yet, so don't treat it as stopped until this has passed
+constexpr auto MinSettleMs = 600;
+constexpr auto StableSamples = 3;
+constexpr auto PanTiltTolerance = 4;
+constexpr auto ZoomTolerance = 16;
+constexpr auto PtzQueryTimeoutMs = 2000;
+
+[[nodiscard]]
+int readNibbles(std::span<uint8_t const> const src) {
+	int out = 0;
+	for (auto const n : src) {
+		out = (out << 4) | (n & 0x0F);
+	}
+	return out;
+}
+
+[[nodiscard]]
+int signExtend(int const val, size_t const bits) {
+	auto const signBit = 1 << (bits - 1);
+	return (val & signBit) ? val - (1 << bits) : val;
+}
+
+template<size_t Sz>
+size_t writeNibbles(std::array<uint8_t, Sz> &dst, size_t i, int const val, size_t const count) {
+	auto const u = static_cast<uint32_t>(val);
+	for (auto n = count; n > 0; --n) {
+		dst[i++] = static_cast<uint8_t>((u >> ((n - 1) * 4)) & 0x0F);
+	}
+	return i;
+}
+
+}
+
 CameraClient::CameraClient(QObject *parent): QObject(parent), m_socket(new QUdpSocket(this)) {
 	// some cameras send replies to the VISCA port rather than the sender's port,
 	// so listen on it if possible to receive poll responses
@@ -24,29 +63,35 @@ CameraClient::CameraClient(QObject *parent): QObject(parent), m_socket(new QUdpS
 	poll();
 	m_pollTimer.start(1000);
 	connect(&m_pollTimer, &QTimer::timeout, this, &CameraClient::poll);
+	connect(&m_ptzTimer, &QTimer::timeout, this, &CameraClient::ptzTick);
 }
 
-void CameraClient::setPresetVC(int const preset, VideoConfig const &vc) {
+void CameraClient::applyPreset(int const preset, CameraPreset const &cp) {
 	if (preset > 0 && preset <= MaxCameraPresets) {
-		// VISCA Memory Recall: 81 01 04 3F 02 pp FF
-		std::array<uint8_t, 7> const cmd{
-			0x81, 0x01, 0x04, 0x3F, 0x02,
-			static_cast<uint8_t>(preset),
-			0xFF
-		};
-		sendVisca(cmd);
-		setBrightness(vc.brightness);
-		setSaturation(vc.saturation);
-		setContrast(vc.contrast);
-		setSharpness(vc.sharpness);
-		setHue(vc.hue);
+		if (cp.usePtz) {
+			startPtzJob({.pan = cp.pan, .tilt = cp.tilt, .zoom = cp.zoom});
+		} else {
+			cancelPtzJob();
+			// VISCA Memory Recall: 81 01 04 3F 02 pp FF
+			std::array<uint8_t, 7> const cmd{
+				0x81, 0x01, 0x04, 0x3F, 0x02,
+				static_cast<uint8_t>(preset),
+				0xFF
+			};
+			sendVisca(cmd);
+		}
+		setBrightness(cp.brightness);
+		setSaturation(cp.saturation);
+		setContrast(cp.contrast);
+		setSharpness(cp.sharpness);
+		setHue(cp.hue);
 	}
 }
 
 void CameraClient::setPreset(int const preset) {
-	auto const vcList = getVideoConfig();
-	if (preset > 0 && preset - 1 < vcList.size()) {
-		setPresetVC(preset, vcList[preset - 1]);
+	auto const presets = getCameraPresets();
+	if (preset > 0 && preset - 1 < presets.size()) {
+		applyPreset(preset, presets[preset - 1]);
 	}
 }
 
@@ -57,6 +102,7 @@ void CameraClient::powerOn() {
 }
 
 void CameraClient::powerOff() {
+	cancelPtzJob();
 	// VISCA Power Off / Standby: 81 01 04 00 03 FF
 	constexpr std::array<uint8_t, 6> cmd{0x81, 0x01, 0x04, 0x00, 0x03, 0xFF};
 	sendVisca(cmd);
@@ -72,7 +118,21 @@ void CameraClient::reboot() {
 	emit pollFailed();
 }
 
+void CameraClient::queryPtzPosition() {
+	m_ptzQuery = PtzQuery{.panTiltGen = m_panTiltGen, .zoomGen = m_zoomGen};
+	auto const id = ++m_ptzQueryId;
+	sendPanTiltInquiry();
+	sendZoomInquiry();
+	QTimer::singleShot(PtzQueryTimeoutMs, this, [this, id] {
+		if (m_ptzQuery && id == m_ptzQueryId) {
+			m_ptzQuery.reset();
+			emit ptzPositionQueryFailed();
+		}
+	});
+}
+
 void CameraClient::reloadConnectionSettings() {
+	cancelPtzJob();
 	auto const [host, port] = getCameraConnectionData();
 	m_host = host;
 	m_port = port;
@@ -142,6 +202,236 @@ void CameraClient::sendDirect(uint8_t const opcode, int const val) {
 	sendVisca(cmd);
 }
 
+void CameraClient::startPtzJob(PtzPosition const &target) {
+	cancelPtzJob();
+	auto const speed = getPtzSpeed();
+	auto &job = m_ptzJob.emplace();
+	job.target = target;
+	job.panTiltSpeed = speed.panTilt;
+	job.zoomSpeed = speed.zoom;
+	startPtzStep();
+	m_ptzTimer.start(PtzTickMs);
+}
+
+void CameraClient::cancelPtzJob() {
+	if (!m_ptzJob) {
+		return;
+	}
+	// stop any movement in progress so the next job doesn't start mid move
+	switch (m_ptzJob->steps[m_ptzJob->stepIdx]) {
+		case PtzStep::Locate:
+			break;
+		case PtzStep::Zoom:
+			sendZoomStop();
+			break;
+		case PtzStep::PanTilt:
+			sendPanTiltStop();
+			break;
+	}
+	m_ptzJob.reset();
+	m_ptzTimer.stop();
+}
+
+void CameraClient::ptzTick() {
+	if (!m_ptzJob) {
+		m_ptzTimer.stop();
+		return;
+	}
+	auto &job = *m_ptzJob;
+	auto const step = job.steps[job.stepIdx];
+	switch (step) {
+		case PtzStep::Locate:
+			if (m_panTiltGen != job.seenPanTiltGen && m_zoomGen != job.seenZoomGen) {
+				// zoom out before panning, zoom in after
+				if (job.target.zoom >= m_ptzPos.zoom) {
+					job.steps = {PtzStep::Locate, PtzStep::PanTilt, PtzStep::Zoom};
+				}
+				advancePtzStep();
+				return;
+			}
+			if (job.stepTimer.elapsed() > LocateTimeoutMs) {
+				// position unknown, so the order can't be chosen, just move everything at once
+				sendZoomDirect(job.target.zoom);
+				sendPanTiltAbsolute(job.target, job.panTiltSpeed);
+				m_ptzJob.reset();
+				m_ptzTimer.stop();
+				return;
+			}
+			sendPanTiltInquiry();
+			sendZoomInquiry();
+			return;
+		case PtzStep::Zoom:
+			if (m_zoomGen != job.seenZoomGen) {
+				job.seenZoomGen = m_zoomGen;
+				if (zoomStepDone()) {
+					advancePtzStep();
+					return;
+				}
+			}
+			break;
+		case PtzStep::PanTilt:
+			if (m_panTiltGen != job.seenPanTiltGen) {
+				job.seenPanTiltGen = m_panTiltGen;
+				if (panTiltStepDone()) {
+					advancePtzStep();
+					return;
+				}
+			}
+			break;
+	}
+	if (job.stepTimer.elapsed() > StepTimeoutMs) {
+		if (step == PtzStep::Zoom && job.zoomDriving) {
+			sendZoomStop();
+			sendZoomDirect(job.target.zoom);
+		}
+		advancePtzStep();
+		return;
+	}
+	if (step == PtzStep::Zoom) {
+		sendZoomInquiry();
+	} else {
+		sendPanTiltInquiry();
+	}
+}
+
+void CameraClient::startPtzStep() {
+	auto &job = *m_ptzJob;
+	job.stepTimer.start();
+	job.moveTimer.start();
+	// require fresh replies, sent after this step began
+	job.seenPanTiltGen = m_panTiltGen;
+	job.seenZoomGen = m_zoomGen;
+	job.lastSample = m_ptzPos;
+	job.stableSamples = 0;
+	job.zoomDriving = false;
+	switch (job.steps[job.stepIdx]) {
+		case PtzStep::Locate:
+			sendPanTiltInquiry();
+			sendZoomInquiry();
+			break;
+		case PtzStep::Zoom:
+			if (job.zoomSpeed > 0 && std::abs(job.target.zoom - m_ptzPos.zoom) > ZoomTolerance) {
+				// drive at the configured speed, then finish with Zoom Direct once the target is reached
+				job.zoomOut = job.target.zoom < m_ptzPos.zoom;
+				job.zoomDriving = true;
+				sendZoomVariable(job.zoomOut, job.zoomSpeed);
+			} else {
+				sendZoomDirect(job.target.zoom);
+			}
+			break;
+		case PtzStep::PanTilt:
+			sendPanTiltAbsolute(job.target, job.panTiltSpeed);
+			break;
+	}
+}
+
+void CameraClient::advancePtzStep() {
+	auto &job = *m_ptzJob;
+	++job.stepIdx;
+	if (job.stepIdx >= job.steps.size()) {
+		m_ptzJob.reset();
+		m_ptzTimer.stop();
+		return;
+	}
+	startPtzStep();
+}
+
+bool CameraClient::zoomStepDone() {
+	auto &job = *m_ptzJob;
+	auto const zoom = m_ptzPos.zoom;
+	auto const stable = ptzStable();
+	if (job.zoomDriving) {
+		auto const reached = job.zoomOut ?
+			zoom <= job.target.zoom + ZoomTolerance :
+			zoom >= job.target.zoom - ZoomTolerance;
+		if (reached || stable) {
+			sendZoomStop();
+			sendZoomDirect(job.target.zoom);
+			job.zoomDriving = false;
+			job.stableSamples = 0;
+			job.moveTimer.start();
+		}
+		return false;
+	}
+	return std::abs(zoom - job.target.zoom) <= ZoomTolerance || stable;
+}
+
+bool CameraClient::panTiltStepDone() {
+	auto const &job = *m_ptzJob;
+	auto const stable = ptzStable();
+	auto const reached =
+		std::abs(m_ptzPos.pan - job.target.pan) <= PanTiltTolerance &&
+		std::abs(m_ptzPos.tilt - job.target.tilt) <= PanTiltTolerance;
+	return reached || stable;
+}
+
+bool CameraClient::ptzStable() {
+	auto &job = *m_ptzJob;
+	if (m_ptzPos == job.lastSample) {
+		++job.stableSamples;
+	} else {
+		job.stableSamples = 0;
+		job.lastSample = m_ptzPos;
+	}
+	return job.stableSamples >= StableSamples && job.moveTimer.elapsed() >= MinSettleMs;
+}
+
+void CameraClient::sendPanTiltInquiry() {
+	// VISCA Pan-tilt Position Inquiry: 81 09 06 12 FF
+	constexpr std::array<uint8_t, 5> inq{0x81, 0x09, 0x06, 0x12, 0xFF};
+	sendVisca(inq, true);
+}
+
+void CameraClient::sendZoomInquiry() {
+	// VISCA Zoom Position Inquiry: 81 09 04 47 FF
+	constexpr std::array<uint8_t, 5> inq{0x81, 0x09, 0x04, 0x47, 0xFF};
+	sendVisca(inq, true);
+}
+
+void CameraClient::sendPanTiltAbsolute(PtzPosition const &pos, int const speed) {
+	// VISCA Pan-tilt Absolute: 81 01 06 02 VV WW 0Y 0Y 0Y 0Y [0Y] 0Z 0Z 0Z 0Z FF
+	std::array<uint8_t, 16> cmd{
+		0x81, 0x01, 0x06, 0x02,
+		static_cast<uint8_t>(std::clamp(speed, 0x01, 0x18)),
+		static_cast<uint8_t>(std::clamp(speed, 0x01, 0x14)),
+	};
+	auto i = writeNibbles(cmd, 6, pos.pan, m_panNibbles);
+	i = writeNibbles(cmd, i, pos.tilt, 4);
+	cmd[i++] = 0xFF;
+	sendVisca(std::span{cmd}.first(i));
+}
+
+void CameraClient::sendPanTiltStop() {
+	// VISCA Pan-tilt Stop: 81 01 06 01 VV WW 03 03 FF
+	constexpr std::array<uint8_t, 9> cmd{0x81, 0x01, 0x06, 0x01, 0x01, 0x01, 0x03, 0x03, 0xFF};
+	sendVisca(cmd);
+}
+
+void CameraClient::sendZoomDirect(int const zoom) {
+	// VISCA Zoom Direct: 81 01 04 47 0p 0q 0r 0s FF
+	std::array<uint8_t, 9> cmd{0x81, 0x01, 0x04, 0x47};
+	auto i = writeNibbles(cmd, 4, std::clamp(zoom, 0, 0xFFFF), 4);
+	cmd[i] = 0xFF;
+	sendVisca(cmd);
+}
+
+void CameraClient::sendZoomVariable(bool const out, int const speed) {
+	// VISCA Zoom Tele (Variable): 81 01 04 07 2p FF, Wide (Variable): 81 01 04 07 3p FF
+	auto const p = static_cast<uint8_t>(std::clamp(speed - 1, 0, 7));
+	std::array<uint8_t, 6> const cmd{
+		0x81, 0x01, 0x04, 0x07,
+		static_cast<uint8_t>((out ? 0x30 : 0x20) | p),
+		0xFF
+	};
+	sendVisca(cmd);
+}
+
+void CameraClient::sendZoomStop() {
+	// VISCA Zoom Stop: 81 01 04 07 00 FF
+	constexpr std::array<uint8_t, 6> cmd{0x81, 0x01, 0x04, 0x07, 0x00, 0xFF};
+	sendVisca(cmd);
+}
+
 ViscaMsg CameraClient::createViscaPacket(std::span<uint8_t const> const viscaMsg, bool const isInquiry) {
 	ViscaMsg packet;
 	if (8 + viscaMsg.size() > MaxMsgSz) {
@@ -204,6 +494,57 @@ void CameraClient::onReadyRead() {
 		m_missedPolls = 0;
 		m_connected = true;
 		emit pollUpdate();
+		std::span<uint8_t const> msg{
+			reinterpret_cast<uint8_t const*>(datagram.constData()),
+			static_cast<size_t>(datagram.size())};
+		// strip the VISCA over IP header if present, raw VISCA replies start with 0x90
+		if (msg.size() >= 8 && msg[0] == 0x01) {
+			// payload type 01 11 is a VISCA reply, others carry no VISCA payload
+			if (msg[1] != 0x11) {
+				continue;
+			}
+			auto const len = static_cast<size_t>((msg[2] << 8) | msg[3]);
+			msg = msg.subspan(8, std::min(len, msg.size() - 8));
+		}
+		handleViscaReply(msg);
+	}
+}
+
+void CameraClient::handleViscaReply(std::span<uint8_t const> const reply) {
+	// inquiry replies: y0 50 [data] FF
+	if (reply.size() < 3 || reply.back() != 0xFF || (reply[1] & 0xF0) != 0x50) {
+		return;
+	}
+	auto const data = reply.subspan(2, reply.size() - 3);
+	if (std::ranges::any_of(data, [](uint8_t const b) { return b > 0x0F; })) {
+		return;
+	}
+	// Replies don't say which inquiry they answer, so identify them by size.
+	// This is unambiguous only because power, pan-tilt, and zoom are the only inquiries sent.
+	switch (data.size()) {
+		case 8: // pan-tilt, 4 nibble pan
+		case 9: { // pan-tilt, 5 nibble pan
+			m_panNibbles = data.size() - 4;
+			auto const panBits = m_panNibbles * 4;
+			m_ptzPos.pan = signExtend(readNibbles(data.first(m_panNibbles)), panBits);
+			m_ptzPos.tilt = signExtend(readNibbles(data.subspan(m_panNibbles)), 16);
+			++m_panTiltGen;
+			break;
+		}
+		case 4: // zoom
+			m_ptzPos.zoom = readNibbles(data);
+			++m_zoomGen;
+			break;
+		default:
+			return;
+	}
+	checkPtzQuery();
+}
+
+void CameraClient::checkPtzQuery() {
+	if (m_ptzQuery && m_ptzQuery->panTiltGen != m_panTiltGen && m_ptzQuery->zoomGen != m_zoomGen) {
+		m_ptzQuery.reset();
+		emit ptzPositionReceived(m_ptzPos.pan, m_ptzPos.tilt, m_ptzPos.zoom);
 	}
 }
 
