@@ -29,6 +29,7 @@ add_subdirectory(src)
 install(
 	PROGRAMS
 		install.sh
+		uninstall.sh
 	DESTINATION
 		.
 )
