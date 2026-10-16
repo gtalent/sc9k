@@ -179,13 +179,20 @@ void MainWindow::setupMenu() {
 		auto const aboutAct = new QAction(tr("&About"), this);
 		connect(aboutAct, &QAction::triggered, &m_cameraClient, [this] {
 			QMessageBox about(this);
-			about.setText(tr(
+			about.setIconPixmap(QPixmap(":/icons/hicolor/128x128/apps/net.drinkingtea.sc9k.png"));
+			auto const text = tr(
 R"(Slide Controller 9000 - %1
 Build date: %2
 
 Copyright 2021 - 2026 Gary Talent (gary@drinkingtea.net)
 Slide Controller 9000 is released under the MPL 2.0
-Built on Qt library under LGPL 2.0)").arg(Version, __DATE__));
+Built on Qt library under LGPL 2.0)").arg(Version, __DATE__);
+			auto const repoUrl = QStringLiteral("https://github.com/gtalent/sc9k");
+			// QMessageBox forces word wrap on long text, so use white-space:pre to
+			// keep lines intact
+			about.setTextFormat(Qt::RichText);
+			about.setText(QStringLiteral("<p style=\"white-space:pre\">%1\n\n<a href=\"%2\">%2</a></p>")
+				.arg(text.toHtmlEscaped(), repoUrl));
 			about.exec();
 		});
 		menu->addAction(aboutAct);
