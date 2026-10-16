@@ -59,7 +59,7 @@ QWidget *SettingsDialog::setupNetworkInputs(QWidget *parent) {
 		m_cameraPortLe->setText(QString::number(c.port));
 		m_cameraPortLe->setValidator(portValidator);
 		lyt->addRow(tr("Camera &Host:"), m_cameraHostLe);
-		lyt->addRow(tr("Ca&mera Port:"), m_cameraPortLe);
+		lyt->addRow(tr("Came&ra Port:"), m_cameraPortLe);
 	}
 	// OpenLP settings
 	{
@@ -145,7 +145,7 @@ QWidget *SettingsDialog::setupCameraPresetConfig(QWidget *parent) {
 				setDirty(true);
 			});
 			// 5 nibble pan on some cameras, 4 nibble tilt and zoom
-			m_pan = mkSb(grp, formLyt, tr("Pan:"), -0x80000, 0x7FFFF);
+			m_pan = mkSb(grp, formLyt, tr("&Pan:"), -0x80000, 0x7FFFF);
 			m_tilt = mkSb(grp, formLyt, tr("T&ilt:"), -0x8000, 0x7FFF);
 			m_zoom = mkSb(grp, formLyt, tr("&Zoom:"), 0, 0xFFFF);
 			m_getPtzBtn = new QPushButton(tr("&Get Current"), grp);
@@ -167,12 +167,12 @@ QWidget *SettingsDialog::setupCameraPresetConfig(QWidget *parent) {
 	connect(presetNo, &QComboBox::currentIndexChanged, this, &SettingsDialog::updateCameraPresetCollect);
 	// transition speed, shared by all presets
 	{
-		auto const grp = new QGroupBox(tr("Transition Speed"), root);
+		auto const grp = new QGroupBox(tr("Transition Speed (Global)"), root);
 		auto const formLyt = mkForm(grp);
 		lyt->addWidget(grp);
 		auto const speed = getPtzSpeed();
 		m_panTiltSpeed = mkSb(grp, formLyt, tr("Pan/Tilt Spee&d:"), 1, 24);
-		m_zoomSpeed = mkSb(grp, formLyt, tr("Zoom Speed:"), 0, 8);
+		m_zoomSpeed = mkSb(grp, formLyt, tr("Zoo&m Speed:"), 0, 8);
 		m_zoomSpeed->setSpecialValueText(tr("Camera Default"));
 		QSignalBlocker const ptBlocker(m_panTiltSpeed);
 		QSignalBlocker const zBlocker(m_zoomSpeed);
@@ -184,7 +184,7 @@ QWidget *SettingsDialog::setupCameraPresetConfig(QWidget *parent) {
 		auto const btnLyt = new QHBoxLayout(btnRoot);
 		lyt->addWidget(btnRoot);
 		btnLyt->setAlignment(Qt::AlignRight);
-		auto const previewBtn = new QPushButton(tr("&Preview"), btnRoot);
+		auto const previewBtn = new QPushButton(tr("P&review"), btnRoot);
 		btnLyt->addWidget(previewBtn);
 		connect(previewBtn, &QPushButton::clicked, this, [this] {
 			this->collectCameraPreset();
