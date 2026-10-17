@@ -1,10 +1,8 @@
-
-# 1.3.0
-
-* Add support for an app defined camera preset system with more natural transitions
-
 # 1.2.0
 
+* Add support for an app defined camera preset system with more natural transitions
+* Add manual focus option to camera presets
+* Add camera calibration, which measures the camera's pan and tilt speeds so preset transitions move in a straight line
 * Replace connection status text in status bar with colored indicators
 * Add Power On, Power Off, and Reboot options to Camera menu
 * Only enable OK and Apply buttons in settings dialog upon changes made
