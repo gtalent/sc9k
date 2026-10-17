@@ -61,6 +61,13 @@ class CameraClient: public QObject {
 			Zoom,
 			PanTilt,
 		};
+		struct PtzAxisMotion {
+			// time since last move command, movement may not have started before MinSettleMs
+			QElapsedTimer moveTimer;
+			// time since the position last changed
+			QElapsedTimer changeTimer;
+			PtzPosition last;
+		};
 		struct PtzJob {
 			PtzPosition target;
 			int panTiltSpeed = 1;
@@ -77,15 +84,17 @@ class CameraClient: public QObject {
 			qint64 zoomInquiryMs = 0;
 			// value sent with the step's last Zoom Direct, -1 if none
 			int zoomDirectSent = -1;
+			// zoom drive timing, which can continue into the next step
+			QElapsedTimer jobTimer;
 			// times out the step
 			QElapsedTimer stepTimer;
-			// time since last move command, movement may not have started before MinSettleMs
-			QElapsedTimer moveTimer;
+			// position when the step started, for measuring its progress
+			PtzPosition stepStart;
 			uint64_t seenPanTiltGen = 0;
 			uint64_t seenZoomGen = 0;
-			PtzPosition lastSample;
-			// time since the position last changed
-			QElapsedTimer lastChangeTimer;
+			// zoom and pan/tilt can move at the same time, so track them separately
+			PtzAxisMotion zoomMotion;
+			PtzAxisMotion panTiltMotion;
 		};
 		std::optional<PtzJob> m_ptzJob;
 		QTimer m_ptzTimer;
@@ -145,8 +154,22 @@ class CameraClient: public QObject {
 
 		void advancePtzStep();
 
+		/**
+		 * Ends the job, unless a zoom drive from an earlier step is still running.
+		 */
+		void finishPtzJob();
+
+		[[nodiscard]]
+		bool hasNextPtzMove() const;
+
 		[[nodiscard]]
 		bool zoomStepDone();
+
+		/**
+		 * @return true if the zoom is close enough to its target to start the next move
+		 */
+		[[nodiscard]]
+		bool zoomNearlyDone() const;
 
 		/**
 		 * Handles a zoom reply while driving the zoom at variable speed.
@@ -166,17 +189,29 @@ class CameraClient: public QObject {
 		bool panTiltStepDone();
 
 		/**
-		 * Records the current position as a sample.
-		 * @return true if the camera appears to have stopped moving
+		 * @return true if pan/tilt is close enough to its target to start the next move
 		 */
 		[[nodiscard]]
-		bool ptzStable();
+		bool panTiltNearlyDone() const;
+
+		[[nodiscard]]
+		bool zoomStable();
+
+		[[nodiscard]]
+		bool panTiltStable();
+
+		/**
+		 * Records whether the axis moved since the last sample.
+		 * @return true if the axis appears to have stopped moving
+		 */
+		[[nodiscard]]
+		bool axisStable(PtzAxisMotion &motion, bool changed) const;
 
 		void sendPanTiltInquiry();
 
 		void sendZoomInquiry();
 
-		void sendPanTiltAbsolute(PtzPosition const &pos, int speed);
+		void sendPanTiltAbsolute(PtzPosition const &pos, int panSpeed, int tiltSpeed);
 
 		void sendPanTiltStop();
 

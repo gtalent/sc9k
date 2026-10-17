@@ -27,6 +27,10 @@ constexpr auto ZoomVelocityWindowMs = 200;
 constexpr auto ZoomStopLeadMs = 150;
 // give a Zoom Direct time to start moving before accepting the position as final
 constexpr auto ZoomDirectStartMs = 250;
+constexpr auto MaxPanSpeed = 0x18;
+constexpr auto MaxTiltSpeed = 0x14;
+// start the next move once the current one has this fraction of its distance left
+constexpr auto PtzOverlap = 0.5;
 // below this, rounding makes the Zoom Direct scale too imprecise to learn from
 constexpr auto MinZoomCalibrationVal = 1000;
 constexpr auto PanTiltTolerance = 4;
@@ -40,6 +44,30 @@ static constexpr int readNibbles(std::span<uint8_t const> const src) {
 		out = (out << 4) | (n & 0x0F);
 	}
 	return out;
+}
+
+/**
+ * @return fraction of the distance from start to target still left to travel
+ */
+[[nodiscard]]
+static constexpr double remainingFraction(int const start, int const pos, int const target) {
+	auto const total = std::abs(target - start);
+	if (total == 0) {
+		return 0;
+	}
+	return static_cast<double>(std::abs(target - pos)) / total;
+}
+
+/**
+ * Scales an axis' speed by its share of the distance, so all axes arrive together.
+ * @return speed for the axis, at least 1
+ */
+[[nodiscard]]
+static constexpr int scaledSpeed(int const speed, int const dist, int const longestDist) {
+	if (longestDist == 0) {
+		return speed;
+	}
+	return std::max(1, (speed * dist + longestDist / 2) / longestDist);
 }
 
 [[nodiscard]]
@@ -220,6 +248,7 @@ void CameraClient::startPtzJob(PtzPosition const &target) {
 	job.target = target;
 	job.panTiltSpeed = speed.panTilt;
 	job.zoomSpeed = speed.zoom;
+	job.jobTimer.start();
 	startPtzStep();
 	m_ptzTimer.start(PtzTickMs);
 }
@@ -228,16 +257,11 @@ void CameraClient::cancelPtzJob() {
 	if (!m_ptzJob) {
 		return;
 	}
-	// stop any movement in progress so the next job doesn't start mid move
-	switch (m_ptzJob->steps[m_ptzJob->stepIdx]) {
-		case PtzStep::Locate:
-			break;
-		case PtzStep::Zoom:
-			sendZoomStop();
-			break;
-		case PtzStep::PanTilt:
-			sendPanTiltStop();
-			break;
+	// stop any movement in progress so the next job doesn't start mid move,
+	// moves overlap, so both axes may be moving
+	if (m_ptzJob->stepIdx > 0) {
+		sendZoomStop();
+		sendPanTiltStop();
 	}
 	m_ptzJob.reset();
 	m_ptzTimer.stop();
@@ -249,6 +273,18 @@ void CameraClient::ptzTick() {
 		return;
 	}
 	auto &job = *m_ptzJob;
+	if (job.zoomDriving && job.jobTimer.elapsed() - job.zoomInquiryMs >= 2 * PtzTickMs) {
+		// reply was probably lost, restart the inquiry chain
+		sendZoomDriveInquiry();
+	}
+	if (job.stepIdx >= job.steps.size()) {
+		// all moves started, waiting on a zoom drive that overlapped into the last step
+		if (job.stepTimer.elapsed() > StepTimeoutMs) {
+			finishZoomDrive();
+		}
+		finishPtzJob();
+		return;
+	}
 	auto const step = job.steps[job.stepIdx];
 	switch (step) {
 		case PtzStep::Locate:
@@ -263,7 +299,7 @@ void CameraClient::ptzTick() {
 			if (job.stepTimer.elapsed() > LocateTimeoutMs) {
 				// position unknown, so the order can't be chosen, just move everything at once
 				sendZoomDirect(job.target.zoom);
-				sendPanTiltAbsolute(job.target, job.panTiltSpeed);
+				sendPanTiltAbsolute(job.target, job.panTiltSpeed, job.panTiltSpeed);
 				m_ptzJob.reset();
 				m_ptzTimer.stop();
 				return;
@@ -280,12 +316,16 @@ void CameraClient::ptzTick() {
 					advancePtzStep();
 					return;
 				}
+				if (zoomNearlyDone()) {
+					advancePtzStep();
+					return;
+				}
 			}
 			break;
 		case PtzStep::PanTilt:
 			if (m_panTiltGen != job.seenPanTiltGen) {
 				job.seenPanTiltGen = m_panTiltGen;
-				if (panTiltStepDone()) {
+				if (panTiltStepDone() || panTiltNearlyDone()) {
 					advancePtzStep();
 					return;
 				}
@@ -293,7 +333,7 @@ void CameraClient::ptzTick() {
 			break;
 	}
 	if (job.stepTimer.elapsed() > StepTimeoutMs) {
-		if (step == PtzStep::Zoom && job.zoomDriving) {
+		if (job.zoomDriving) {
 			finishZoomDrive();
 		}
 		advancePtzStep();
@@ -302,9 +342,6 @@ void CameraClient::ptzTick() {
 	if (step == PtzStep::Zoom) {
 		if (!job.zoomDriving) {
 			sendZoomInquiry();
-		} else if (job.stepTimer.elapsed() - job.zoomInquiryMs >= 2 * PtzTickMs) {
-			// reply was probably lost, restart the inquiry chain
-			sendZoomDriveInquiry();
 		}
 	} else {
 		sendPanTiltInquiry();
@@ -314,20 +351,23 @@ void CameraClient::ptzTick() {
 void CameraClient::startPtzStep() {
 	auto &job = *m_ptzJob;
 	job.stepTimer.start();
-	job.moveTimer.start();
 	// require fresh replies, sent after this step began
 	job.seenPanTiltGen = m_panTiltGen;
 	job.seenZoomGen = m_zoomGen;
-	job.lastSample = m_ptzPos;
-	job.lastChangeTimer.start();
-	job.zoomDriving = false;
-	job.zoomDirectSent = -1;
+	job.stepStart = m_ptzPos;
+	auto const resetMotion = [this](PtzAxisMotion &motion) {
+		motion.moveTimer.start();
+		motion.changeTimer.start();
+		motion.last = m_ptzPos;
+	};
 	switch (job.steps[job.stepIdx]) {
 		case PtzStep::Locate:
 			sendPanTiltInquiry();
 			sendZoomInquiry();
 			break;
 		case PtzStep::Zoom:
+			resetMotion(job.zoomMotion);
+			job.zoomDirectSent = -1;
 			if (job.zoomSpeed > 0 && std::abs(job.target.zoom - m_ptzPos.zoom) > ZoomTolerance) {
 				// drive at the configured speed, then finish with Zoom Direct once the target is reached
 				job.zoomOut = job.target.zoom < m_ptzPos.zoom;
@@ -342,9 +382,19 @@ void CameraClient::startPtzStep() {
 			// already in position otherwise, and even a tiny move can make the camera refocus
 			break;
 		case PtzStep::PanTilt:
-			if (std::abs(job.target.pan - m_ptzPos.pan) > PanTiltTolerance ||
-			    std::abs(job.target.tilt - m_ptzPos.tilt) > PanTiltTolerance) {
-				sendPanTiltAbsolute(job.target, job.panTiltSpeed);
+			resetMotion(job.panTiltMotion);
+			if (auto const panDist = std::abs(job.target.pan - m_ptzPos.pan),
+			               tiltDist = std::abs(job.target.tilt - m_ptzPos.tilt);
+			    panDist > PanTiltTolerance || tiltDist > PanTiltTolerance) {
+				// the longer axis moves at the configured speed and the shorter one slower,
+				// so they arrive together and the camera moves in a straight line
+				auto const panLonger = panDist >= tiltDist;
+				auto const speed = std::clamp(job.panTiltSpeed, 1, panLonger ? MaxPanSpeed : MaxTiltSpeed);
+				auto const longestDist = std::max(panDist, tiltDist);
+				sendPanTiltAbsolute(
+					job.target,
+					scaledSpeed(speed, panDist, longestDist),
+					scaledSpeed(speed, tiltDist, longestDist));
 			}
 			break;
 	}
@@ -354,21 +404,38 @@ void CameraClient::advancePtzStep() {
 	auto &job = *m_ptzJob;
 	++job.stepIdx;
 	if (job.stepIdx >= job.steps.size()) {
-		m_ptzJob.reset();
-		m_ptzTimer.stop();
+		finishPtzJob();
 		return;
 	}
 	startPtzStep();
 }
 
+void CameraClient::finishPtzJob() {
+	if (m_ptzJob->zoomDriving) {
+		return;
+	}
+	m_ptzJob.reset();
+	m_ptzTimer.stop();
+}
+
+bool CameraClient::hasNextPtzMove() const {
+	return m_ptzJob->stepIdx + 1 < m_ptzJob->steps.size();
+}
+
 bool CameraClient::zoomStepDone() {
 	auto const &job = *m_ptzJob;
-	auto const stable = ptzStable();
-	if (job.zoomDirectSent >= 0 && job.moveTimer.elapsed() < ZoomDirectStartMs) {
+	auto const stable = zoomStable();
+	if (job.zoomDirectSent >= 0 && job.zoomMotion.moveTimer.elapsed() < ZoomDirectStartMs) {
 		// position may be from before the Zoom Direct took effect
 		return false;
 	}
 	return std::abs(m_ptzPos.zoom - job.target.zoom) <= ZoomTolerance || stable;
+}
+
+bool CameraClient::zoomNearlyDone() const {
+	auto const &job = *m_ptzJob;
+	return hasNextPtzMove() &&
+		remainingFraction(job.stepStart.zoom, m_ptzPos.zoom, job.target.zoom) <= PtzOverlap;
 }
 
 void CameraClient::calibrateZoomDirect() {
@@ -388,7 +455,7 @@ void CameraClient::calibrateZoomDirect() {
 void CameraClient::updateZoomDrive() {
 	auto &job = *m_ptzJob;
 	job.seenZoomGen = m_zoomGen;
-	auto const now = job.stepTimer.elapsed();
+	auto const now = job.jobTimer.elapsed();
 	auto const zoom = m_ptzPos.zoom;
 	// distance left in the direction of travel, negative once past the target
 	auto const remaining = job.zoomOut ? zoom - job.target.zoom : job.target.zoom - zoom;
@@ -402,9 +469,14 @@ void CameraClient::updateZoomDrive() {
 		job.zoomAnchorVal = zoom;
 	}
 	auto const lead = job.zoomVelocity * ZoomStopLeadMs;
-	if (remaining - lead <= ZoomTolerance || ptzStable()) {
+	if (remaining - lead <= ZoomTolerance || zoomStable()) {
 		finishZoomDrive();
 		return;
+	}
+	auto const inZoomStep = job.stepIdx < job.steps.size() && job.steps[job.stepIdx] == PtzStep::Zoom;
+	if (inZoomStep && zoomNearlyDone()) {
+		// start the next move, the drive continues alongside it
+		advancePtzStep();
 	}
 	sendZoomDriveInquiry();
 }
@@ -412,34 +484,52 @@ void CameraClient::updateZoomDrive() {
 void CameraClient::finishZoomDrive() {
 	auto &job = *m_ptzJob;
 	sendZoomStop();
-	// correct any remaining error, the step completes once the zoom settles
+	// correct any remaining error, the zoom step completes once the zoom settles
 	sendZoomDirect(job.target.zoom);
 	job.zoomDriving = false;
-	job.moveTimer.start();
-	job.lastChangeTimer.start();
+	job.zoomMotion.moveTimer.start();
+	job.zoomMotion.changeTimer.start();
 }
 
 void CameraClient::sendZoomDriveInquiry() {
-	m_ptzJob->zoomInquiryMs = m_ptzJob->stepTimer.elapsed();
+	m_ptzJob->zoomInquiryMs = m_ptzJob->jobTimer.elapsed();
 	sendZoomInquiry();
 }
 
 bool CameraClient::panTiltStepDone() {
 	auto const &job = *m_ptzJob;
-	auto const stable = ptzStable();
+	auto const stable = panTiltStable();
 	auto const reached =
 		std::abs(m_ptzPos.pan - job.target.pan) <= PanTiltTolerance &&
 		std::abs(m_ptzPos.tilt - job.target.tilt) <= PanTiltTolerance;
 	return reached || stable;
 }
 
-bool CameraClient::ptzStable() {
-	auto &job = *m_ptzJob;
-	if (m_ptzPos != job.lastSample) {
-		job.lastSample = m_ptzPos;
-		job.lastChangeTimer.start();
+bool CameraClient::panTiltNearlyDone() const {
+	auto const &job = *m_ptzJob;
+	// pan and tilt move together, so go by whichever has further to go
+	auto const remaining = std::max(
+		remainingFraction(job.stepStart.pan, m_ptzPos.pan, job.target.pan),
+		remainingFraction(job.stepStart.tilt, m_ptzPos.tilt, job.target.tilt));
+	return hasNextPtzMove() && remaining <= PtzOverlap;
+}
+
+bool CameraClient::zoomStable() {
+	auto &motion = m_ptzJob->zoomMotion;
+	return axisStable(motion, m_ptzPos.zoom != motion.last.zoom);
+}
+
+bool CameraClient::panTiltStable() {
+	auto &motion = m_ptzJob->panTiltMotion;
+	return axisStable(motion, m_ptzPos.pan != motion.last.pan || m_ptzPos.tilt != motion.last.tilt);
+}
+
+bool CameraClient::axisStable(PtzAxisMotion &motion, bool const changed) const {
+	if (changed) {
+		motion.last = m_ptzPos;
+		motion.changeTimer.start();
 	}
-	return job.lastChangeTimer.elapsed() >= StableMs && job.moveTimer.elapsed() >= MinSettleMs;
+	return motion.changeTimer.elapsed() >= StableMs && motion.moveTimer.elapsed() >= MinSettleMs;
 }
 
 void CameraClient::sendPanTiltInquiry() {
@@ -454,12 +544,12 @@ void CameraClient::sendZoomInquiry() {
 	sendVisca(inq, true);
 }
 
-void CameraClient::sendPanTiltAbsolute(PtzPosition const &pos, int const speed) {
+void CameraClient::sendPanTiltAbsolute(PtzPosition const &pos, int const panSpeed, int const tiltSpeed) {
 	// VISCA Pan-tilt Absolute: 81 01 06 02 VV WW 0Y 0Y 0Y 0Y [0Y] 0Z 0Z 0Z 0Z FF
 	std::array<uint8_t, 16> cmd{
 		0x81, 0x01, 0x06, 0x02,
-		static_cast<uint8_t>(std::clamp(speed, 0x01, 0x18)),
-		static_cast<uint8_t>(std::clamp(speed, 0x01, 0x14)),
+		static_cast<uint8_t>(std::clamp(panSpeed, 1, MaxPanSpeed)),
+		static_cast<uint8_t>(std::clamp(tiltSpeed, 1, MaxTiltSpeed)),
 	};
 	auto i = writeNibbles(cmd, 6, pos.pan, m_panNibbles);
 	i = writeNibbles(cmd, i, pos.tilt, 4);
@@ -606,7 +696,7 @@ void CameraClient::handleViscaReply(std::span<uint8_t const> const reply) {
 			m_ptzPos.zoom = readNibbles(data);
 			++m_zoomGen;
 			// react immediately rather than on the next tick, a stale position overshoots the target
-			if (m_ptzJob && m_ptzJob->steps[m_ptzJob->stepIdx] == PtzStep::Zoom && m_ptzJob->zoomDriving) {
+			if (m_ptzJob && m_ptzJob->zoomDriving) {
 				updateZoomDrive();
 			}
 			break;
