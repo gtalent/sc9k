@@ -48,6 +48,15 @@ PtzSpeed getPtzSpeed(class QSettings &settings);
 [[nodiscard]]
 PtzSpeed getPtzSpeed();
 
+/**
+ * Ratio of the zoom position the camera reports to the value sent with Zoom Direct.
+ * Some cameras use different scales for the two, so this is learned from the camera.
+ */
+void setZoomDirectScale(double scale);
+
+[[nodiscard]]
+double getZoomDirectScale();
+
 struct ConnectionData {
 	QString host;
 	uint16_t port = 0;

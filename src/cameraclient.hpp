@@ -53,6 +53,8 @@ class CameraClient: public QObject {
 		uint64_t m_zoomGen = 0;
 		// pan is 4 nibbles on most cameras, 5 on some, detected from inquiry replies
 		size_t m_panNibbles = 4;
+		// reported zoom position / Zoom Direct value, learned from the camera
+		double m_zoomDirectScale = 1.0;
 
 		enum class PtzStep {
 			Locate,
@@ -67,6 +69,14 @@ class CameraClient: public QObject {
 			size_t stepIdx = 0;
 			bool zoomDriving = false;
 			bool zoomOut = false;
+			// start of the current zoom velocity measurement window
+			qint64 zoomAnchorMs = -1;
+			int zoomAnchorVal = 0;
+			// zoom units per ms toward the target
+			double zoomVelocity = 0;
+			qint64 zoomInquiryMs = 0;
+			// value sent with the step's last Zoom Direct, -1 if none
+			int zoomDirectSent = -1;
 			// times out the step
 			QElapsedTimer stepTimer;
 			// time since last move command, movement may not have started before MinSettleMs
@@ -74,7 +84,8 @@ class CameraClient: public QObject {
 			uint64_t seenPanTiltGen = 0;
 			uint64_t seenZoomGen = 0;
 			PtzPosition lastSample;
-			int stableSamples = 0;
+			// time since the position last changed
+			QElapsedTimer lastChangeTimer;
 		};
 		std::optional<PtzJob> m_ptzJob;
 		QTimer m_ptzTimer;
@@ -136,6 +147,20 @@ class CameraClient: public QObject {
 
 		[[nodiscard]]
 		bool zoomStepDone();
+
+		/**
+		 * Handles a zoom reply while driving the zoom at variable speed.
+		 */
+		void updateZoomDrive();
+
+		void finishZoomDrive();
+
+		void sendZoomDriveInquiry();
+
+		/**
+		 * Updates the Zoom Direct scale from where the camera settled after a Zoom Direct.
+		 */
+		void calibrateZoomDirect();
 
 		[[nodiscard]]
 		bool panTiltStepDone();

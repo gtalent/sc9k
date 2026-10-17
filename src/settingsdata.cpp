@@ -87,6 +87,16 @@ PtzSpeed getPtzSpeed() {
 	return getPtzSpeed(s);
 }
 
+void setZoomDirectScale(double const scale) {
+	QSettings s;
+	s.setValue("Camera/ZoomDirectScale", scale);
+}
+
+double getZoomDirectScale() {
+	QSettings s;
+	return s.value("Camera/ZoomDirectScale", 1.0).toDouble();
+}
+
 void setCameraConnectionData(QSettings &settings, ConnectionData const &cd) {
 	settings.beginGroup("CameraClient");
 	settings.setValue("Host", cd.host);
