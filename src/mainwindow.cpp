@@ -19,9 +19,8 @@
 #include "slideview.hpp"
 #include "mainwindow.hpp"
 
-namespace {
-
-QPixmap statusDot(QColor const &color) {
+[[nodiscard]]
+static QPixmap statusDot(QColor const &color) {
 	constexpr auto size = 10;
 	auto const dpr = qApp->devicePixelRatio();
 	QPixmap pixmap(static_cast<int>(size * dpr), static_cast<int>(size * dpr));
@@ -35,12 +34,10 @@ QPixmap statusDot(QColor const &color) {
 	return pixmap;
 }
 
-void setStatusIndicator(QLabel *dot, QString const &name, bool connected) {
+static void setStatusIndicator(QLabel *const dot, QString const &name, bool const connected) {
 	dot->setPixmap(statusDot(connected ? QColor(0x2e, 0xb8, 0x4b) : QColor(0xd9, 0x3a, 0x3a)));
 	dot->parentWidget()->setToolTip(
 		name + ": " + (connected ? MainWindow::tr("Connected") : MainWindow::tr("Not Connected")));
-}
-
 }
 
 MainWindow::MainWindow(QWidget *parent): QMainWindow(parent) {
