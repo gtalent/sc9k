@@ -14,7 +14,9 @@
 #include <optional>
 #include <span>
 
+#include <QByteArray>
 #include <QElapsedTimer>
+#include <QHash>
 #include <QHostAddress>
 #include <QSet>
 #include <QObject>
@@ -47,6 +49,17 @@ class CameraClient: public QObject {
 		QUdpSocket *const m_socket = nullptr;
 		QTimer m_pollTimer;
 		uint32_t m_sequenceNumber = 1;
+		// for retrying commands the camera rejects because both its command slots are busy
+		struct SentCommand {
+			QByteArray msg;
+			int attempt = 0;
+			qint64 sentMs = 0;
+			uint64_t epoch = 0;
+		};
+		QHash<uint32_t, SentCommand> m_sentCommands;
+		// incremented when a move is cancelled, so its commands aren't retried afterwards
+		uint64_t m_commandEpoch = 0;
+		QElapsedTimer m_clock;
 		int m_missedPolls = 0;
 		bool m_connected = false;
 		// last reported position, generation counters increment on each reply
@@ -91,6 +104,10 @@ class CameraClient: public QObject {
 			// manual focus position, autofocus if empty
 			std::optional<int> focus;
 			int panTiltSpeed = 1;
+			// speeds of the step's Pan-tilt Absolute, for resending it, 0 if none was sent
+			int panSpeedSent = 0;
+			int tiltSpeedSent = 0;
+			int panTiltResends = 0;
 			int zoomSpeed = 0;
 			std::array<PtzStep, 4> steps{PtzStep::Locate, PtzStep::Zoom, PtzStep::PanTilt, PtzStep::Focus};
 			size_t stepIdx = 0;
@@ -118,6 +135,8 @@ class CameraClient: public QObject {
 		};
 		std::optional<PtzJob> m_ptzJob;
 		QTimer m_ptzTimer;
+		// spaces out zoom drive inquiries
+		QTimer m_zoomInquiryTimer;
 
 		struct PtzQuery {
 			uint64_t panTiltGen = 0;
@@ -260,6 +279,14 @@ class CameraClient: public QObject {
 		void sendZoomDriveInquiry();
 
 		/**
+		 * Sends the next zoom drive inquiry, no sooner than the camera can report a new position.
+		 */
+		void scheduleZoomDriveInquiry();
+
+		[[nodiscard]]
+		static char const *ptzStepName(PtzStep step);
+
+		/**
 		 * Updates the Zoom Direct scale from where the camera settled after a Zoom Direct.
 		 */
 		void calibrateZoomDirect();
@@ -357,6 +384,16 @@ class CameraClient: public QObject {
 		void onHostLookup(class QHostInfo const &hostInfo);
 
 		void sendVisca(std::span<uint8_t const> viscaMsg, bool isInquiry = false);
+
+		/**
+		 * @param attempt number of times the command was rejected and retried
+		 */
+		void sendViscaAttempt(std::span<uint8_t const> viscaMsg, bool isInquiry, int attempt);
+
+		/**
+		 * Handles an error reply, retrying the command if the camera was too busy for it.
+		 */
+		void handleViscaError(uint8_t code, std::span<uint8_t const> reply, std::optional<uint32_t> seq);
 
 		[[nodiscard]]
 		ViscaMsg createViscaPacket(std::span<uint8_t const> viscaMsg, bool isInquiry = false);

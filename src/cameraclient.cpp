@@ -9,12 +9,28 @@
 #include <concepts>
 
 #include <QHostInfo>
+#include <QLoggingCategory>
 
 #include "cameraclient.hpp"
 #include "consts.hpp"
 #include "settingsdata.hpp"
 
+// Commands, move steps, and camera errors. Debug output is off by default,
+// enable it with QT_LOGGING_RULES="sc9k.camera.debug=true".
+Q_LOGGING_CATEGORY(lcCamera, "sc9k.camera", QtWarningMsg)
+// Every reply, including positions while moving, which is a lot of output.
+// Enable with QT_LOGGING_RULES="sc9k.camera.replies.debug=true".
+Q_LOGGING_CATEGORY(lcCameraReplies, "sc9k.camera.replies", QtWarningMsg)
+
 constexpr auto PtzTickMs = 150;
+// The camera only updates its reported zoom every ~40 ms, so asking faster is wasted.
+// On a fast network, asking as soon as each reply arrives would flood the camera.
+constexpr auto ZoomDriveInquiryMinMs = 25;
+// a command rejected because the camera is busy is retried until it gets through or the move changes
+constexpr auto CommandRetryMs = 200;
+constexpr auto MaxCommandRetries = 50;
+// sent commands are kept this long in case the camera rejects them
+constexpr auto SentCommandTtlMs = 3000;
 // how long to wait for the starting position before moving everything at once
 constexpr auto LocateTimeoutMs = 1500;
 constexpr auto StepTimeoutMs = 20000;
@@ -37,6 +53,9 @@ constexpr auto MinZoomCalibrationVal = 1000;
 constexpr auto PanTiltTolerance = 2;
 constexpr auto ZoomTolerance = 4;
 constexpr auto PtzQueryTimeoutMs = 2000;
+// The camera silently ignores a Pan-tilt Absolute sent while a variable speed zoom is running,
+// so a pan/tilt move that never starts is resent, which also covers the rest of a zoom drive.
+constexpr auto MaxPanTiltResends = 10;
 
 constexpr auto CalibrationTickMs = 30;
 // camera stopped replying
@@ -156,6 +175,13 @@ CameraClient::CameraClient(QObject *parent): QObject(parent), m_socket(new QUdpS
 	connect(&m_pollTimer, &QTimer::timeout, this, &CameraClient::poll);
 	connect(&m_ptzTimer, &QTimer::timeout, this, &CameraClient::ptzTick);
 	connect(&m_calibrationTimer, &QTimer::timeout, this, &CameraClient::calibrationTick);
+	m_zoomInquiryTimer.setSingleShot(true);
+	connect(&m_zoomInquiryTimer, &QTimer::timeout, this, [this] {
+		if (m_ptzJob && m_ptzJob->zoomDriving) {
+			sendZoomDriveInquiry();
+		}
+	});
+	m_clock.start();
 	m_zoomDirectScale = getZoomDirectScale();
 	reloadCalibration();
 }
@@ -284,8 +310,9 @@ void CameraClient::reloadConnectionSettings() {
 	m_host = host;
 	m_port = port;
 	m_sequenceNumber = 1;
-	// sequence numbers restart, so pending ones could be mistaken for new inquiries
+	// sequence numbers restart, so pending ones could be mistaken for new ones
 	m_focusInquirySeqs.clear();
+	m_sentCommands.clear();
 	m_missedPolls = 0;
 	m_addr.clear();
 	if (m_lookupId != -1) {
@@ -364,6 +391,8 @@ void CameraClient::startPtzJob(PtzPosition const &target, std::optional<int> con
 	job.panTiltSpeed = speed.panTilt;
 	job.zoomSpeed = speed.zoom;
 	job.jobTimer.start();
+	qCDebug(lcCamera).nospace() << "PTZ job start: target pan " << target.pan << ", tilt " << target.tilt
+		<< ", zoom " << target.zoom << ", focus " << (focus ? QString::number(*focus) : QStringLiteral("auto"));
 	startPtzStep();
 	m_ptzTimer.start(PtzTickMs);
 }
@@ -372,6 +401,9 @@ void CameraClient::cancelPtzJob() {
 	if (!m_ptzJob) {
 		return;
 	}
+	qCDebug(lcCamera) << "PTZ job cancelled";
+	// the job's commands shouldn't be retried once it's gone
+	++m_commandEpoch;
 	// stop any movement in progress so the next job doesn't start mid move,
 	// moves overlap, so both axes may be moving
 	if (m_ptzJob->stepIdx > 0) {
@@ -380,6 +412,7 @@ void CameraClient::cancelPtzJob() {
 	}
 	m_ptzJob.reset();
 	m_ptzTimer.stop();
+	m_zoomInquiryTimer.stop();
 }
 
 void CameraClient::ptzTick() {
@@ -412,6 +445,7 @@ void CameraClient::ptzTick() {
 				return;
 			}
 			if (job.stepTimer.elapsed() > LocateTimeoutMs) {
+				qCWarning(lcCamera) << "PTZ locate timed out, camera did not report its position";
 				// position unknown, so the order can't be chosen, just move everything at once,
 				// manual focus would be thrown off by zoom tracking, so it is skipped
 				sendZoomDirect(job.target.zoom);
@@ -497,6 +531,8 @@ void CameraClient::startPtzStep() {
 	job.seenPanTiltGen = m_panTiltGen;
 	job.seenZoomGen = m_zoomGen;
 	job.stepStart = m_ptzPos;
+	qCDebug(lcCamera).nospace() << "PTZ step " << ptzStepName(job.steps[job.stepIdx])
+		<< " from pan " << m_ptzPos.pan << ", tilt " << m_ptzPos.tilt << ", zoom " << m_ptzPos.zoom;
 	auto const resetMotion = [this](PtzAxisMotion &motion) {
 		motion.moveTimer.start();
 		motion.changeTimer.start();
@@ -525,6 +561,9 @@ void CameraClient::startPtzStep() {
 			break;
 		case PtzStep::PanTilt:
 			resetMotion(job.panTiltMotion);
+			job.panSpeedSent = 0;
+			job.tiltSpeedSent = 0;
+			job.panTiltResends = 0;
 			if (auto const panDist = std::abs(job.target.pan - m_ptzPos.pan),
 			               tiltDist = std::abs(job.target.tilt - m_ptzPos.tilt);
 			    panDist > PanTiltTolerance || tiltDist > PanTiltTolerance) {
@@ -534,10 +573,9 @@ void CameraClient::startPtzStep() {
 				auto const speed = std::clamp(job.panTiltSpeed, 1, panLonger ? m_maxPanSpeed : m_maxTiltSpeed);
 				auto const velocity = panLonger ? m_panVelocity[speed] : m_tiltVelocity[speed];
 				auto const ratio = static_cast<double>(std::min(panDist, tiltDist)) / std::max(panDist, tiltDist);
-				sendPanTiltAbsolute(
-					job.target,
-					panLonger ? speed : speedForVelocity(m_panVelocity, velocity * ratio),
-					panLonger ? speedForVelocity(m_tiltVelocity, velocity * ratio) : speed);
+				job.panSpeedSent = panLonger ? speed : speedForVelocity(m_panVelocity, velocity * ratio);
+				job.tiltSpeedSent = panLonger ? speedForVelocity(m_tiltVelocity, velocity * ratio) : speed;
+				sendPanTiltAbsolute(job.target, job.panSpeedSent, job.tiltSpeedSent);
 			}
 			break;
 		case PtzStep::Focus:
@@ -559,6 +597,8 @@ void CameraClient::finishPtzJob() {
 	if (m_ptzJob->zoomDriving) {
 		return;
 	}
+	qCDebug(lcCamera).nospace() << "PTZ job done at pan " << m_ptzPos.pan << ", tilt " << m_ptzPos.tilt
+		<< ", zoom " << m_ptzPos.zoom;
 	m_ptzJob.reset();
 	m_ptzTimer.stop();
 }
@@ -625,17 +665,29 @@ void CameraClient::updateZoomDrive() {
 		// start the next move, the drive continues alongside it
 		advancePtzStep();
 	}
-	sendZoomDriveInquiry();
+	scheduleZoomDriveInquiry();
 }
 
 void CameraClient::finishZoomDrive() {
 	auto &job = *m_ptzJob;
+	qCDebug(lcCamera) << "PTZ zoom drive finished at" << m_ptzPos.zoom << "target" << job.target.zoom;
+	m_zoomInquiryTimer.stop();
 	sendZoomStop();
 	// correct any remaining error, the zoom step completes once the zoom settles
 	sendZoomDirect(job.target.zoom);
 	job.zoomDriving = false;
 	job.zoomMotion.moveTimer.start();
 	job.zoomMotion.changeTimer.start();
+	// a Pan-tilt Absolute sent during the drive was likely ignored, resend it now the drive
+	// has stopped rather than waiting for the pan/tilt step to notice
+	auto const inPanTiltStep = job.stepIdx < job.steps.size() && job.steps[job.stepIdx] == PtzStep::PanTilt;
+	if (inPanTiltStep && job.panSpeedSent > 0 &&
+	    std::abs(m_ptzPos.pan - job.stepStart.pan) <= PanTiltTolerance &&
+	    std::abs(m_ptzPos.tilt - job.stepStart.tilt) <= PanTiltTolerance) {
+		sendPanTiltAbsolute(job.target, job.panSpeedSent, job.tiltSpeedSent);
+		job.panTiltMotion.moveTimer.start();
+		job.panTiltMotion.changeTimer.start();
+	}
 }
 
 void CameraClient::sendZoomDriveInquiry() {
@@ -643,12 +695,51 @@ void CameraClient::sendZoomDriveInquiry() {
 	sendZoomInquiry();
 }
 
+void CameraClient::scheduleZoomDriveInquiry() {
+	if (m_zoomInquiryTimer.isActive()) {
+		return;
+	}
+	auto const sinceLast = m_ptzJob->jobTimer.elapsed() - m_ptzJob->zoomInquiryMs;
+	if (sinceLast >= ZoomDriveInquiryMinMs) {
+		sendZoomDriveInquiry();
+	} else {
+		m_zoomInquiryTimer.start(static_cast<int>(ZoomDriveInquiryMinMs - sinceLast));
+	}
+}
+
+char const *CameraClient::ptzStepName(PtzStep const step) {
+	switch (step) {
+		case PtzStep::Locate:
+			return "Locate";
+		case PtzStep::Zoom:
+			return "Zoom";
+		case PtzStep::PanTilt:
+			return "PanTilt";
+		case PtzStep::Focus:
+			return "Focus";
+	}
+	return "Unknown";
+}
+
 bool CameraClient::panTiltStepDone() {
-	auto const &job = *m_ptzJob;
+	auto &job = *m_ptzJob;
 	auto const stable = panTiltStable();
 	auto const reached =
 		std::abs(m_ptzPos.pan - job.target.pan) <= PanTiltTolerance &&
 		std::abs(m_ptzPos.tilt - job.target.tilt) <= PanTiltTolerance;
+	if (stable && !reached && job.panSpeedSent > 0 && job.panTiltResends < MaxPanTiltResends) {
+		auto const moved =
+			std::abs(m_ptzPos.pan - job.stepStart.pan) > PanTiltTolerance ||
+			std::abs(m_ptzPos.tilt - job.stepStart.tilt) > PanTiltTolerance;
+		if (!moved) {
+			++job.panTiltResends;
+			qCWarning(lcCamera) << "camera did not start the pan/tilt move, resending, attempt" << job.panTiltResends;
+			sendPanTiltAbsolute(job.target, job.panSpeedSent, job.tiltSpeedSent);
+			job.panTiltMotion.moveTimer.start();
+			job.panTiltMotion.changeTimer.start();
+			return false;
+		}
+	}
 	return reached || stable;
 }
 
@@ -961,6 +1052,9 @@ void CameraClient::finishCalibrationMeasurement() {
 }
 
 void CameraClient::finishCalibration(bool const ok, QString const &error, bool const restore) {
+	qCDebug(lcCamera) << "calibration finished:" << (ok ? "ok" : qPrintable(error));
+	// calibration moves shouldn't be retried once it's over
+	++m_commandEpoch;
 	auto cal = std::move(*m_calibration);
 	m_calibration.reset();
 	m_calibrationTimer.stop();
@@ -1094,13 +1188,61 @@ ViscaMsg CameraClient::createViscaPacket(std::span<uint8_t const> const viscaMsg
 }
 
 void CameraClient::sendVisca(std::span<uint8_t const> const viscaMsg, bool const isInquiry) {
+	sendViscaAttempt(viscaMsg, isInquiry, 0);
+}
+
+void CameraClient::sendViscaAttempt(std::span<uint8_t const> const viscaMsg, bool const isInquiry, int const attempt) {
 	if (m_addr.isNull() || m_port == 0) {
 		return;
 	}
+	auto const seq = m_sequenceNumber;
 	auto const packet = createViscaPacket(viscaMsg, isInquiry);
-	if (packet.size > 0) {
-		m_socket->writeDatagram(reinterpret_cast<char const*>(packet.data.data()), static_cast<qint64>(packet.size), m_addr, m_port);
+	if (packet.size == 0) {
+		return;
 	}
+	m_socket->writeDatagram(reinterpret_cast<char const*>(packet.data.data()), static_cast<qint64>(packet.size), m_addr, m_port);
+	QByteArray const msg(reinterpret_cast<char const*>(viscaMsg.data()), static_cast<qsizetype>(viscaMsg.size()));
+	if (isInquiry) {
+		qCDebug(lcCameraReplies).nospace() << "inquiry seq " << seq << ": " << msg.toHex(' ');
+		return;
+	}
+	qCDebug(lcCamera).nospace() << "command seq " << seq << ": " << msg.toHex(' ');
+	auto const now = m_clock.elapsed();
+	m_sentCommands.removeIf([now](auto const &it) {
+		return now - it.value().sentMs > SentCommandTtlMs;
+	});
+	m_sentCommands.insert(seq, {.msg = msg, .attempt = attempt, .sentMs = now, .epoch = m_commandEpoch});
+}
+
+void CameraClient::handleViscaError(uint8_t const code, std::span<uint8_t const> const reply, std::optional<uint32_t> const seq) {
+	auto const name = [code] {
+		switch (code) {
+			case 0x01: return "message length error";
+			case 0x02: return "syntax error";
+			case 0x03: return "command buffer full";
+			case 0x04: return "command cancelled";
+			case 0x05: return "no socket";
+			case 0x41: return "command not executable";
+			default: return "unknown error";
+		}
+	}();
+	auto const sent = seq ? m_sentCommands.take(*seq) : SentCommand{};
+	qCWarning(lcCamera).nospace() << "camera " << name << " for seq "
+		<< (seq ? QString::number(*seq) : QStringLiteral("?")) << ": " << sent.msg.toHex(' ')
+		<< " (reply " << QByteArray(reinterpret_cast<char const*>(reply.data()), static_cast<qsizetype>(reply.size())).toHex(' ') << ")";
+	// only a busy camera is worth retrying, other errors would just fail again
+	if (code != 0x03 || sent.msg.isEmpty() || sent.attempt >= MaxCommandRetries) {
+		return;
+	}
+	QTimer::singleShot(CommandRetryMs, this, [this, sent] {
+		if (sent.epoch != m_commandEpoch) {
+			// the move this belonged to was cancelled
+			return;
+		}
+		auto const bytes = std::span{reinterpret_cast<uint8_t const*>(sent.msg.constData()), static_cast<size_t>(sent.msg.size())};
+		qCDebug(lcCamera) << "retrying command, attempt" << sent.attempt + 1;
+		sendViscaAttempt(bytes, false, sent.attempt + 1);
+	});
 }
 
 void CameraClient::poll() {
@@ -1150,8 +1292,20 @@ void CameraClient::onReadyRead() {
 }
 
 void CameraClient::handleViscaReply(std::span<uint8_t const> const reply, std::optional<uint32_t> const seq) {
-	// inquiry replies: y0 50 [data] FF
-	if (reply.size() < 3 || reply.back() != 0xFF || (reply[1] & 0xF0) != 0x50) {
+	if (lcCameraReplies().isDebugEnabled()) {
+		qCDebug(lcCameraReplies).nospace() << "reply seq " << (seq ? QString::number(*seq) : QStringLiteral("?")) << ": "
+			<< QByteArray(reinterpret_cast<char const*>(reply.data()), static_cast<qsizetype>(reply.size())).toHex(' ');
+	}
+	if (reply.size() < 3 || reply.back() != 0xFF) {
+		return;
+	}
+	// errors: y0 6z ee FF
+	if ((reply[1] & 0xF0) == 0x60) {
+		handleViscaError(reply[2], reply, seq);
+		return;
+	}
+	// inquiry replies: y0 50 [data] FF, command acknowledgements and completions carry no data
+	if ((reply[1] & 0xF0) != 0x50) {
 		return;
 	}
 	auto const data = reply.subspan(2, reply.size() - 3);
