@@ -16,6 +16,7 @@
 
 #include <QElapsedTimer>
 #include <QHostAddress>
+#include <QSet>
 #include <QObject>
 #include <QString>
 #include <QTimer>
@@ -51,6 +52,11 @@ class CameraClient: public QObject {
 		PtzPosition m_ptzPos;
 		uint64_t m_panTiltGen = 0;
 		uint64_t m_zoomGen = 0;
+		int m_focusPos = 0;
+		uint64_t m_focusGen = 0;
+		// Focus and zoom replies are the same size, so focus replies are told apart by
+		// sequence number. Pan-tilt replies don't echo it reliably, but their size is unique.
+		QSet<uint32_t> m_focusInquirySeqs;
 		// pan is 4 nibbles on most cameras, 5 on some, detected from inquiry replies
 		size_t m_panNibbles = 4;
 		// reported zoom position / Zoom Direct value, learned from the camera
@@ -60,6 +66,8 @@ class CameraClient: public QObject {
 			Locate,
 			Zoom,
 			PanTilt,
+			// set manual focus once the zoom has settled
+			Focus,
 		};
 		struct PtzAxisMotion {
 			// time since last move command, movement may not have started before MinSettleMs
@@ -70,9 +78,11 @@ class CameraClient: public QObject {
 		};
 		struct PtzJob {
 			PtzPosition target;
+			// manual focus position, autofocus if empty
+			std::optional<int> focus;
 			int panTiltSpeed = 1;
 			int zoomSpeed = 0;
-			std::array<PtzStep, 3> steps{PtzStep::Locate, PtzStep::Zoom, PtzStep::PanTilt};
+			std::array<PtzStep, 4> steps{PtzStep::Locate, PtzStep::Zoom, PtzStep::PanTilt, PtzStep::Focus};
 			size_t stepIdx = 0;
 			bool zoomDriving = false;
 			bool zoomOut = false;
@@ -102,6 +112,7 @@ class CameraClient: public QObject {
 		struct PtzQuery {
 			uint64_t panTiltGen = 0;
 			uint64_t zoomGen = 0;
+			uint64_t focusGen = 0;
 		};
 		std::optional<PtzQuery> m_ptzQuery;
 		int m_ptzQueryId = 0;
@@ -123,7 +134,7 @@ class CameraClient: public QObject {
 		bool connected() const noexcept;
 
 		/**
-		 * Requests the current pan, tilt, and zoom position.
+		 * Requests the current pan, tilt, zoom, and focus position.
 		 * Emits ptzPositionReceived or ptzPositionQueryFailed.
 		 */
 		void queryPtzPosition();
@@ -144,7 +155,7 @@ class CameraClient: public QObject {
 
 		void sendDirect(uint8_t opcode, int val);
 
-		void startPtzJob(PtzPosition const &target);
+		void startPtzJob(PtzPosition const &target, std::optional<int> focus);
 
 		void cancelPtzJob();
 
@@ -211,6 +222,14 @@ class CameraClient: public QObject {
 
 		void sendZoomInquiry();
 
+		void sendFocusInquiry();
+
+		void sendFocusAuto();
+
+		void sendFocusManual();
+
+		void sendFocusDirect(int focus);
+
 		void sendPanTiltAbsolute(PtzPosition const &pos, int panSpeed, int tiltSpeed);
 
 		void sendPanTiltStop();
@@ -221,7 +240,10 @@ class CameraClient: public QObject {
 
 		void sendZoomStop();
 
-		void handleViscaReply(std::span<uint8_t const> reply);
+		/**
+		 * @param seq sequence number from the VISCA over IP header, if there was one
+		 */
+		void handleViscaReply(std::span<uint8_t const> reply, std::optional<uint32_t> seq);
 
 		void checkPtzQuery();
 
@@ -244,7 +266,10 @@ class CameraClient: public QObject {
 
 		void pollFailed();
 
-		void ptzPositionReceived(int pan, int tilt, int zoom);
+		/**
+		 * @param focus -1 if the camera didn't report it
+		 */
+		void ptzPositionReceived(int pan, int tilt, int zoom, int focus);
 
 		void ptzPositionQueryFailed();
 

@@ -23,6 +23,9 @@ struct CameraPreset {
 	int pan = 0;
 	int tilt = 0;
 	int zoom = 0;
+	// when false, the camera autofocuses
+	bool manualFocus = false;
+	int focus = 0;
 };
 
 void setCameraPresets(class QSettings &settings, QVector<CameraPreset> const &presets);

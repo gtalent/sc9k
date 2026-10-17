@@ -42,7 +42,7 @@ SettingsDialog::SettingsDialog(QWidget *parent): QDialog(parent) {
 	tabs->addTab(setupCameraPresetConfig(tabs), tr("Ca&mera Presets"));
 	tabs->addTab(setupNetworkInputs(tabs), tr("&Network"));
 	lyt->addWidget(setupButtons(this));
-	setFixedSize(480, 540);
+	setFixedSize(530, 0);
 }
 
 QWidget *SettingsDialog::setupNetworkInputs(QWidget *parent) {
@@ -134,7 +134,7 @@ QWidget *SettingsDialog::setupCameraPresetConfig(QWidget *parent) {
 		}
 		// position
 		{
-			auto const grp = new QGroupBox(tr("Position"), presetRoot);
+			auto const grp = new QGroupBox(tr("Position && Focus"), presetRoot);
 			auto const formLyt = mkForm(grp);
 			presetLyt->addWidget(grp);
 			m_usePtz = new QCheckBox(tr("&Use PTZ"), grp);
@@ -148,6 +148,14 @@ QWidget *SettingsDialog::setupCameraPresetConfig(QWidget *parent) {
 			m_pan = mkSb(grp, formLyt, tr("&Pan:"), -0x80000, 0x7FFFF);
 			m_tilt = mkSb(grp, formLyt, tr("T&ilt:"), -0x8000, 0x7FFF);
 			m_zoom = mkSb(grp, formLyt, tr("&Zoom:"), 0, 0xFFFF);
+			m_manualFocus = new QCheckBox(tr("Manua&l Focus"), grp);
+			m_manualFocus->setToolTip(tr("When off, the camera autofocuses"));
+			formLyt->addRow(m_manualFocus);
+			connect(m_manualFocus, &QCheckBox::toggled, this, [this] {
+				updatePtzEnabled();
+				setDirty(true);
+			});
+			m_focus = mkSb(grp, formLyt, tr("&Focus:"), 0, 0xFFFF);
 			m_getPtzBtn = new QPushButton(tr("&Get Current"), grp);
 			formLyt->addRow(m_getPtzBtn);
 			updateGetPtzEnabled();
@@ -200,13 +208,16 @@ void SettingsDialog::setCameraConnected(bool const connected) {
 	updateGetPtzEnabled();
 }
 
-void SettingsDialog::setPtzPosition(int const pan, int const tilt, int const zoom) {
+void SettingsDialog::setPtzPosition(int const pan, int const tilt, int const zoom, int const focus) {
 	m_ptzQueryPending = false;
 	updateGetPtzEnabled();
 	m_usePtz->setChecked(true);
 	m_pan->setValue(pan);
 	m_tilt->setValue(tilt);
 	m_zoom->setValue(zoom);
+	if (focus >= 0) {
+		m_focus->setValue(focus);
+	}
 }
 
 void SettingsDialog::ptzPositionQueryFailed() {
@@ -411,6 +422,10 @@ void SettingsDialog::collectCameraPreset() {
 	getVal(cp.pan, m_pan);
 	getVal(cp.tilt, m_tilt);
 	getVal(cp.zoom, m_zoom);
+	if (m_manualFocus) {
+		cp.manualFocus = m_manualFocus->isChecked();
+	}
+	getVal(cp.focus, m_focus);
 }
 
 void SettingsDialog::updateCameraPreset(int const preset) {
@@ -435,6 +450,11 @@ void SettingsDialog::updateCameraPreset(int const preset) {
 	setVal(cp.pan, m_pan);
 	setVal(cp.tilt, m_tilt);
 	setVal(cp.zoom, m_zoom);
+	if (m_manualFocus) {
+		QSignalBlocker const blocker(m_manualFocus);
+		m_manualFocus->setChecked(cp.manualFocus);
+	}
+	setVal(cp.focus, m_focus);
 	updatePtzEnabled();
 	m_vidCurrentPreset = preset;
 }
@@ -450,6 +470,12 @@ void SettingsDialog::updatePtzEnabled() {
 		if (sb) {
 			sb->setEnabled(enabled);
 		}
+	}
+	if (m_manualFocus) {
+		m_manualFocus->setEnabled(enabled);
+	}
+	if (m_focus) {
+		m_focus->setEnabled(enabled && m_manualFocus && m_manualFocus->isChecked());
 	}
 }
 

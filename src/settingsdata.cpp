@@ -26,6 +26,8 @@ void setCameraPresets(QSettings &settings, QVector<CameraPreset> const &presets)
 		settings.setValue("pan", p.pan);
 		settings.setValue("tilt", p.tilt);
 		settings.setValue("zoom", p.zoom);
+		settings.setValue("manualFocus", p.manualFocus);
+		settings.setValue("focus", p.focus);
 		++i;
 	}
 	settings.endArray();
@@ -53,6 +55,8 @@ QVector<CameraPreset> getCameraPresets(QSettings &settings) {
 			.pan = settings.value("pan", 0).toInt(),
 			.tilt = settings.value("tilt", 0).toInt(),
 			.zoom = settings.value("zoom", 0).toInt(),
+			.manualFocus = settings.value("manualFocus", false).toBool(),
+			.focus = settings.value("focus", 0).toInt(),
 		};
 	}
 	settings.endArray();

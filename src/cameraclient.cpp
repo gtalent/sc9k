@@ -6,6 +6,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+#include <concepts>
+
 #include <QHostInfo>
 
 #include "cameraclient.hpp"
@@ -83,6 +85,19 @@ static constexpr int speedForVelocity(std::span<double const> const velocities, 
 	return static_cast<int>(best);
 }
 
+template<std::unsigned_integral T>
+[[nodiscard]]
+static constexpr std::optional<T> readBigEndian(std::span<uint8_t const, sizeof(T)> const src) {
+	if (src.size() < sizeof(T)) {
+		return std::nullopt;
+	}
+	T out = 0;
+	for (auto const b : src) {
+		out = static_cast<T>((out << 8) | b);
+	}
+	return out;
+}
+
 [[nodiscard]]
 static constexpr int signExtend(int const val, size_t const bits) {
 	auto const signBit = 1 << (bits - 1);
@@ -117,7 +132,9 @@ CameraClient::CameraClient(QObject *parent): QObject(parent), m_socket(new QUdpS
 void CameraClient::applyPreset(int const preset, CameraPreset const &cp) {
 	if (preset > 0 && preset <= MaxCameraPresets) {
 		if (cp.usePtz) {
-			startPtzJob({.pan = cp.pan, .tilt = cp.tilt, .zoom = cp.zoom});
+			startPtzJob(
+				{.pan = cp.pan, .tilt = cp.tilt, .zoom = cp.zoom},
+				cp.manualFocus ? std::optional{cp.focus} : std::nullopt);
 		} else {
 			cancelPtzJob();
 			// VISCA Memory Recall: 81 01 04 3F 02 pp FF
@@ -171,13 +188,21 @@ bool CameraClient::connected() const noexcept {
 }
 
 void CameraClient::queryPtzPosition() {
-	m_ptzQuery = PtzQuery{.panTiltGen = m_panTiltGen, .zoomGen = m_zoomGen};
+	m_ptzQuery = PtzQuery{.panTiltGen = m_panTiltGen, .zoomGen = m_zoomGen, .focusGen = m_focusGen};
 	auto const id = ++m_ptzQueryId;
 	sendPanTiltInquiry();
 	sendZoomInquiry();
+	sendFocusInquiry();
 	QTimer::singleShot(PtzQueryTimeoutMs, this, [this, id] {
-		if (m_ptzQuery && id == m_ptzQueryId) {
-			m_ptzQuery.reset();
+		if (!m_ptzQuery || id != m_ptzQueryId) {
+			return;
+		}
+		auto const query = *m_ptzQuery;
+		m_ptzQuery.reset();
+		if (query.panTiltGen != m_panTiltGen && query.zoomGen != m_zoomGen) {
+			// focus isn't essential, report the position without it
+			emit ptzPositionReceived(m_ptzPos.pan, m_ptzPos.tilt, m_ptzPos.zoom, -1);
+		} else {
 			emit ptzPositionQueryFailed();
 		}
 	});
@@ -189,6 +214,8 @@ void CameraClient::reloadConnectionSettings() {
 	m_host = host;
 	m_port = port;
 	m_sequenceNumber = 1;
+	// sequence numbers restart, so pending ones could be mistaken for new inquiries
+	m_focusInquirySeqs.clear();
 	m_missedPolls = 0;
 	m_addr.clear();
 	if (m_lookupId != -1) {
@@ -254,11 +281,16 @@ void CameraClient::sendDirect(uint8_t const opcode, int const val) {
 	sendVisca(cmd);
 }
 
-void CameraClient::startPtzJob(PtzPosition const &target) {
+void CameraClient::startPtzJob(PtzPosition const &target, std::optional<int> const focus) {
 	cancelPtzJob();
 	auto const speed = getPtzSpeed();
 	auto &job = m_ptzJob.emplace();
 	job.target = target;
+	job.focus = focus;
+	if (!focus) {
+		// the previous preset may have left the camera in manual focus
+		sendFocusAuto();
+	}
 	job.panTiltSpeed = speed.panTilt;
 	job.zoomSpeed = speed.zoom;
 	job.jobTimer.start();
@@ -304,13 +336,14 @@ void CameraClient::ptzTick() {
 			if (m_panTiltGen != job.seenPanTiltGen && m_zoomGen != job.seenZoomGen) {
 				// zoom out before panning, zoom in after
 				if (job.target.zoom >= m_ptzPos.zoom) {
-					job.steps = {PtzStep::Locate, PtzStep::PanTilt, PtzStep::Zoom};
+					job.steps = {PtzStep::Locate, PtzStep::PanTilt, PtzStep::Zoom, PtzStep::Focus};
 				}
 				advancePtzStep();
 				return;
 			}
 			if (job.stepTimer.elapsed() > LocateTimeoutMs) {
-				// position unknown, so the order can't be chosen, just move everything at once
+				// position unknown, so the order can't be chosen, just move everything at once,
+				// manual focus would be thrown off by zoom tracking, so it is skipped
 				sendZoomDirect(job.target.zoom);
 				sendPanTiltAbsolute(job.target, job.panTiltSpeed, job.panTiltSpeed);
 				m_ptzJob.reset();
@@ -344,20 +377,46 @@ void CameraClient::ptzTick() {
 				}
 			}
 			break;
+		case PtzStep::Focus:
+			if (!job.focus) {
+				advancePtzStep();
+				return;
+			}
+			// the camera adjusts focus as it zooms, so focus can only be set once the zoom settles
+			if (!job.zoomDriving && m_zoomGen != job.seenZoomGen) {
+				job.seenZoomGen = m_zoomGen;
+				if (zoomStepDone()) {
+					sendFocusManual();
+					sendFocusDirect(*job.focus);
+					advancePtzStep();
+					return;
+				}
+			}
+			break;
 	}
 	if (job.stepTimer.elapsed() > StepTimeoutMs) {
 		if (job.zoomDriving) {
 			finishZoomDrive();
 		}
+		if (step == PtzStep::Focus && job.focus) {
+			sendFocusManual();
+			sendFocusDirect(*job.focus);
+		}
 		advancePtzStep();
 		return;
 	}
-	if (step == PtzStep::Zoom) {
-		if (!job.zoomDriving) {
-			sendZoomInquiry();
-		}
-	} else {
-		sendPanTiltInquiry();
+	switch (step) {
+		case PtzStep::Locate:
+			break;
+		case PtzStep::Zoom:
+		case PtzStep::Focus:
+			if (!job.zoomDriving) {
+				sendZoomInquiry();
+			}
+			break;
+		case PtzStep::PanTilt:
+			sendPanTiltInquiry();
+			break;
 	}
 }
 
@@ -413,6 +472,8 @@ void CameraClient::startPtzStep() {
 					panLonger ? speedForVelocity(TiltVelocity, velocity * ratio) : speed);
 			}
 			break;
+		case PtzStep::Focus:
+			break;
 	}
 }
 
@@ -435,7 +496,9 @@ void CameraClient::finishPtzJob() {
 }
 
 bool CameraClient::hasNextPtzMove() const {
-	return m_ptzJob->stepIdx + 1 < m_ptzJob->steps.size();
+	auto const next = m_ptzJob->stepIdx + 1;
+	// focus waits for the zoom to settle anyway, so only pan/tilt and zoom overlap
+	return next < m_ptzJob->steps.size() && m_ptzJob->steps[next] != PtzStep::Focus;
 }
 
 bool CameraClient::zoomStepDone() {
@@ -560,6 +623,37 @@ void CameraClient::sendZoomInquiry() {
 	sendVisca(inq, true);
 }
 
+void CameraClient::sendFocusInquiry() {
+	// unanswered inquiries would otherwise accumulate
+	if (m_focusInquirySeqs.size() > 16) {
+		m_focusInquirySeqs.clear();
+	}
+	m_focusInquirySeqs.insert(m_sequenceNumber);
+	// VISCA Focus Position Inquiry: 81 09 04 48 FF
+	constexpr std::array<uint8_t, 5> inq{0x81, 0x09, 0x04, 0x48, 0xFF};
+	sendVisca(inq, true);
+}
+
+void CameraClient::sendFocusAuto() {
+	// VISCA Focus Auto: 81 01 04 38 02 FF
+	constexpr std::array<uint8_t, 6> cmd{0x81, 0x01, 0x04, 0x38, 0x02, 0xFF};
+	sendVisca(cmd);
+}
+
+void CameraClient::sendFocusManual() {
+	// VISCA Focus Manual: 81 01 04 38 03 FF
+	constexpr std::array<uint8_t, 6> cmd{0x81, 0x01, 0x04, 0x38, 0x03, 0xFF};
+	sendVisca(cmd);
+}
+
+void CameraClient::sendFocusDirect(int const focus) {
+	// VISCA Focus Direct: 81 01 04 48 0p 0q 0r 0s FF
+	std::array<uint8_t, 9> cmd{0x81, 0x01, 0x04, 0x48};
+	auto i = writeNibbles(cmd, 4, std::clamp(focus, 0, 0xFFFF), 4);
+	cmd[i] = 0xFF;
+	sendVisca(cmd);
+}
+
 void CameraClient::sendPanTiltAbsolute(PtzPosition const &pos, int const panSpeed, int const tiltSpeed) {
 	// VISCA Pan-tilt Absolute: 81 01 06 02 VV WW 0Y 0Y 0Y 0Y [0Y] 0Z 0Z 0Z 0Z FF
 	std::array<uint8_t, 16> cmd{
@@ -674,6 +768,7 @@ void CameraClient::onReadyRead() {
 		std::span<uint8_t const> msg{
 			reinterpret_cast<uint8_t const*>(datagram.constData()),
 			static_cast<size_t>(datagram.size())};
+		std::optional<uint32_t> seq;
 		// strip the VISCA over IP header if present, raw VISCA replies start with 0x90
 		if (msg.size() >= 8 && msg[0] == 0x01) {
 			// payload type 01 11 is a VISCA reply, others carry no VISCA payload
@@ -681,13 +776,14 @@ void CameraClient::onReadyRead() {
 				continue;
 			}
 			auto const len = static_cast<size_t>((msg[2] << 8) | msg[3]);
+			seq = readBigEndian<uint32_t>(msg.subspan<4, sizeof(uint32_t)>());
 			msg = msg.subspan(8, std::min(len, msg.size() - 8));
 		}
-		handleViscaReply(msg);
+		handleViscaReply(msg, seq);
 	}
 }
 
-void CameraClient::handleViscaReply(std::span<uint8_t const> const reply) {
+void CameraClient::handleViscaReply(std::span<uint8_t const> const reply, std::optional<uint32_t> const seq) {
 	// inquiry replies: y0 50 [data] FF
 	if (reply.size() < 3 || reply.back() != 0xFF || (reply[1] & 0xF0) != 0x50) {
 		return;
@@ -696,8 +792,9 @@ void CameraClient::handleViscaReply(std::span<uint8_t const> const reply) {
 	if (std::ranges::any_of(data, [](uint8_t const b) { return b > 0x0F; })) {
 		return;
 	}
-	// Replies don't say which inquiry they answer, so identify them by size.
-	// This is unambiguous only because power, pan-tilt, and zoom are the only inquiries sent.
+	// Replies don't say which inquiry they answer, so identify them by size,
+	// and for zoom and focus, which are the same size, by sequence number.
+	// The only 1 byte reply is power, since focus mode is never inquired.
 	switch (data.size()) {
 		case 8: // pan-tilt, 4 nibble pan
 		case 9: { // pan-tilt, 5 nibble pan
@@ -708,7 +805,12 @@ void CameraClient::handleViscaReply(std::span<uint8_t const> const reply) {
 			++m_panTiltGen;
 			break;
 		}
-		case 4: // zoom
+		case 4: // zoom or focus
+			if (seq && m_focusInquirySeqs.remove(*seq)) {
+				m_focusPos = readNibbles(data);
+				++m_focusGen;
+				break;
+			}
 			m_ptzPos.zoom = readNibbles(data);
 			++m_zoomGen;
 			// react immediately rather than on the next tick, a stale position overshoots the target
@@ -723,9 +825,12 @@ void CameraClient::handleViscaReply(std::span<uint8_t const> const reply) {
 }
 
 void CameraClient::checkPtzQuery() {
-	if (m_ptzQuery && m_ptzQuery->panTiltGen != m_panTiltGen && m_ptzQuery->zoomGen != m_zoomGen) {
+	if (m_ptzQuery &&
+	    m_ptzQuery->panTiltGen != m_panTiltGen &&
+	    m_ptzQuery->zoomGen != m_zoomGen &&
+	    m_ptzQuery->focusGen != m_focusGen) {
 		m_ptzQuery.reset();
-		emit ptzPositionReceived(m_ptzPos.pan, m_ptzPos.tilt, m_ptzPos.zoom);
+		emit ptzPositionReceived(m_ptzPos.pan, m_ptzPos.tilt, m_ptzPos.zoom, m_focusPos);
 	}
 }
 

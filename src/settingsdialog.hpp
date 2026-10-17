@@ -36,6 +36,8 @@ class SettingsDialog: public QDialog {
 		class QSpinBox *m_pan = nullptr;
 		class QSpinBox *m_tilt = nullptr;
 		class QSpinBox *m_zoom = nullptr;
+		class QCheckBox *m_manualFocus = nullptr;
+		class QSpinBox *m_focus = nullptr;
 		class QPushButton *m_getPtzBtn = nullptr;
 		bool m_cameraConnected = false;
 		bool m_ptzQueryPending = false;
@@ -48,7 +50,10 @@ class SettingsDialog: public QDialog {
 
 		void setCameraConnected(bool connected);
 
-		void setPtzPosition(int pan, int tilt, int zoom);
+		/**
+		 * @param focus -1 if unknown
+		 */
+		void setPtzPosition(int pan, int tilt, int zoom, int focus);
 
 		void ptzPositionQueryFailed();
 	private:
