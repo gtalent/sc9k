@@ -29,12 +29,23 @@ constexpr auto ZoomStopLeadMs = 150;
 constexpr auto ZoomDirectStartMs = 250;
 constexpr auto MaxPanSpeed = 0x18;
 constexpr auto MaxTiltSpeed = 0x14;
+// position units per second at each VISCA speed (index 0 unused), measured on the camera,
+// speeds are far from linear, and tilt barely gets faster above 12
+constexpr std::array<double, MaxPanSpeed + 1> PanVelocity{
+	0, 25, 31, 44, 60, 85, 110, 145, 180, 224, 268, 322, 376,
+	450, 523, 554, 584, 631, 677, 718, 759, 804, 848, 857, 866,
+};
+constexpr std::array<double, MaxTiltSpeed + 1> TiltVelocity{
+	0, 24, 31, 43, 60, 83, 112, 144, 177, 219, 260, 305, 350,
+	355, 360, 365, 370, 372, 375, 375, 375,
+};
 // start the next move once the current one has this fraction of its distance left
 constexpr auto PtzOverlap = 0.5;
 // below this, rounding makes the Zoom Direct scale too imprecise to learn from
 constexpr auto MinZoomCalibrationVal = 1000;
-constexpr auto PanTiltTolerance = 4;
-constexpr auto ZoomTolerance = 16;
+// camera lands exactly on pan/tilt and Zoom Direct targets, allow a little for other cameras
+constexpr auto PanTiltTolerance = 2;
+constexpr auto ZoomTolerance = 4;
 constexpr auto PtzQueryTimeoutMs = 2000;
 
 [[nodiscard]]
@@ -59,15 +70,17 @@ static constexpr double remainingFraction(int const start, int const pos, int co
 }
 
 /**
- * Scales an axis' speed by its share of the distance, so all axes arrive together.
- * @return speed for the axis, at least 1
+ * @return the speed whose velocity is closest to the given velocity, at least 1
  */
 [[nodiscard]]
-static constexpr int scaledSpeed(int const speed, int const dist, int const longestDist) {
-	if (longestDist == 0) {
-		return speed;
+static constexpr int speedForVelocity(std::span<double const> const velocities, double const velocity) {
+	size_t best = 1;
+	for (size_t i = 2; i < velocities.size(); ++i) {
+		if (std::abs(velocities[i] - velocity) < std::abs(velocities[best] - velocity)) {
+			best = i;
+		}
 	}
-	return std::max(1, (speed * dist + longestDist / 2) / longestDist);
+	return static_cast<int>(best);
 }
 
 [[nodiscard]]
@@ -390,11 +403,14 @@ void CameraClient::startPtzStep() {
 				// so they arrive together and the camera moves in a straight line
 				auto const panLonger = panDist >= tiltDist;
 				auto const speed = std::clamp(job.panTiltSpeed, 1, panLonger ? MaxPanSpeed : MaxTiltSpeed);
-				auto const longestDist = std::max(panDist, tiltDist);
+				auto const velocity = panLonger ?
+					PanVelocity[static_cast<size_t>(speed)] :
+					TiltVelocity[static_cast<size_t>(speed)];
+				auto const ratio = static_cast<double>(std::min(panDist, tiltDist)) / std::max(panDist, tiltDist);
 				sendPanTiltAbsolute(
 					job.target,
-					scaledSpeed(speed, panDist, longestDist),
-					scaledSpeed(speed, tiltDist, longestDist));
+					panLonger ? speed : speedForVelocity(PanVelocity, velocity * ratio),
+					panLonger ? speedForVelocity(TiltVelocity, velocity * ratio) : speed);
 			}
 			break;
 	}
