@@ -29,18 +29,6 @@ constexpr auto ZoomVelocityWindowMs = 200;
 constexpr auto ZoomStopLeadMs = 150;
 // give a Zoom Direct time to start moving before accepting the position as final
 constexpr auto ZoomDirectStartMs = 250;
-constexpr auto MaxPanSpeed = 0x18;
-constexpr auto MaxTiltSpeed = 0x14;
-// position units per second at each VISCA speed (index 0 unused), measured on the camera,
-// speeds are far from linear, and tilt barely gets faster above 12
-constexpr std::array<double, MaxPanSpeed + 1> PanVelocity{
-	0, 25, 31, 44, 60, 85, 110, 145, 180, 224, 268, 322, 376,
-	450, 523, 554, 584, 631, 677, 718, 759, 804, 848, 857, 866,
-};
-constexpr std::array<double, MaxTiltSpeed + 1> TiltVelocity{
-	0, 24, 31, 43, 60, 83, 112, 144, 177, 219, 260, 305, 350,
-	355, 360, 365, 370, 372, 375, 375, 375,
-};
 // start the next move once the current one has this fraction of its distance left
 constexpr auto PtzOverlap = 0.5;
 // below this, rounding makes the Zoom Direct scale too imprecise to learn from
@@ -49,6 +37,25 @@ constexpr auto MinZoomCalibrationVal = 1000;
 constexpr auto PanTiltTolerance = 2;
 constexpr auto ZoomTolerance = 4;
 constexpr auto PtzQueryTimeoutMs = 2000;
+
+constexpr auto CalibrationTickMs = 30;
+// camera stopped replying
+constexpr auto CalibrationReplyTimeoutMs = 2000;
+// cameras without the max speed inquiry don't answer it
+constexpr auto CalibrationMaxSpeedTimeoutMs = 1000;
+constexpr auto CalibrationPhaseTimeoutMs = 20000;
+// position unchanged for this long means the camera has stopped
+constexpr auto CalibrationSettleMs = 500;
+// camera may not have started moving yet, so don't treat it as stopped until this has passed
+constexpr auto CalibrationMinSettleMs = 300;
+// return home before the next measurement once this far from it, to stay clear of the limits
+constexpr auto CalibrationPanDrift = 500;
+constexpr auto CalibrationTiltDrift = 150;
+// least movement to measure a velocity from
+constexpr auto CalibrationMinSamples = 8;
+constexpr auto CalibrationMinSampleMs = 250;
+// Zoom Direct value used to measure the zoom scale, mid range on most cameras
+constexpr auto CalibrationZoomVal = 8000;
 
 [[nodiscard]]
 static constexpr int readNibbles(std::span<uint8_t const> const src) {
@@ -104,6 +111,28 @@ static constexpr int signExtend(int const val, size_t const bits) {
 	return (val & signBit) ? val - (1 << bits) : val;
 }
 
+/**
+ * @return how long to drive an axis for a speed measurement, long enough to measure
+ * slow speeds and short enough to keep fast ones within range
+ */
+[[nodiscard]]
+static constexpr qint64 calibrationDriveMs(bool const tilt, int const speed) {
+	// tilt range is much smaller than pan range
+	if (tilt) {
+		return speed <= 4 ? 1200 : speed <= 12 ? 700 : 500;
+	}
+	return speed <= 4 ? 1600 : speed <= 12 ? 1000 : 700;
+}
+
+/**
+ * Measurements are noisy where the speed curve flattens out, but a faster speed is never slower.
+ */
+static void makeNonDecreasing(QVector<double> &vals) {
+	for (qsizetype i = 1; i < vals.size(); ++i) {
+		vals[i] = std::max(vals[i], vals[i - 1]);
+	}
+}
+
 template<size_t Sz>
 static constexpr size_t writeNibbles(std::array<uint8_t, Sz> &dst, size_t i, int const val, size_t const count) {
 	auto const u = static_cast<uint32_t>(val);
@@ -126,11 +155,17 @@ CameraClient::CameraClient(QObject *parent): QObject(parent), m_socket(new QUdpS
 	m_pollTimer.start(1000);
 	connect(&m_pollTimer, &QTimer::timeout, this, &CameraClient::poll);
 	connect(&m_ptzTimer, &QTimer::timeout, this, &CameraClient::ptzTick);
+	connect(&m_calibrationTimer, &QTimer::timeout, this, &CameraClient::calibrationTick);
 	m_zoomDirectScale = getZoomDirectScale();
+	reloadCalibration();
 }
 
 void CameraClient::applyPreset(int const preset, CameraPreset const &cp) {
 	if (preset > 0 && preset <= MaxCameraPresets) {
+		if (m_calibration) {
+			// live use takes priority, and the preset moves the camera anyway
+			finishCalibration(false, tr("Calibration was interrupted by a camera preset."), false);
+		}
 		if (cp.usePtz) {
 			startPtzJob(
 				{.pan = cp.pan, .tilt = cp.tilt, .zoom = cp.zoom},
@@ -168,6 +203,9 @@ void CameraClient::powerOn() {
 
 void CameraClient::powerOff() {
 	cancelPtzJob();
+	if (m_calibration) {
+		finishCalibration(false, tr("Calibration was interrupted by powering off the camera."), false);
+	}
 	// VISCA Power Off / Standby: 81 01 04 00 03 FF
 	constexpr std::array<uint8_t, 6> cmd{0x81, 0x01, 0x04, 0x00, 0x03, 0xFF};
 	sendVisca(cmd);
@@ -208,8 +246,40 @@ void CameraClient::queryPtzPosition() {
 	});
 }
 
+void CameraClient::startCalibration() {
+	if (m_calibration) {
+		return;
+	}
+	if (!m_connected) {
+		emit calibrationFinished(false, tr("Camera is not connected."));
+		return;
+	}
+	cancelPtzJob();
+	auto &cal = m_calibration.emplace();
+	cal.replyTimer.start();
+	enterCalibrationPhase(CalibrationJob::Phase::Start);
+	m_calibrationTimer.start(CalibrationTickMs);
+}
+
+void CameraClient::cancelCalibration() {
+	if (m_calibration) {
+		finishCalibration(false, tr("Calibration was cancelled."));
+	}
+}
+
+void CameraClient::reloadCalibration() {
+	auto const cal = getCameraCalibration();
+	m_maxPanSpeed = cal.maxPanSpeed;
+	m_maxTiltSpeed = cal.maxTiltSpeed;
+	m_panVelocity = cal.panVelocity;
+	m_tiltVelocity = cal.tiltVelocity;
+}
+
 void CameraClient::reloadConnectionSettings() {
 	cancelPtzJob();
+	if (m_calibration) {
+		finishCalibration(false, tr("Calibration was interrupted by a change of connection settings."), false);
+	}
 	auto const [host, port] = getCameraConnectionData();
 	m_host = host;
 	m_port = port;
@@ -461,15 +531,13 @@ void CameraClient::startPtzStep() {
 				// the longer axis moves at the configured speed and the shorter one slower,
 				// so they arrive together and the camera moves in a straight line
 				auto const panLonger = panDist >= tiltDist;
-				auto const speed = std::clamp(job.panTiltSpeed, 1, panLonger ? MaxPanSpeed : MaxTiltSpeed);
-				auto const velocity = panLonger ?
-					PanVelocity[static_cast<size_t>(speed)] :
-					TiltVelocity[static_cast<size_t>(speed)];
+				auto const speed = std::clamp(job.panTiltSpeed, 1, panLonger ? m_maxPanSpeed : m_maxTiltSpeed);
+				auto const velocity = panLonger ? m_panVelocity[speed] : m_tiltVelocity[speed];
 				auto const ratio = static_cast<double>(std::min(panDist, tiltDist)) / std::max(panDist, tiltDist);
 				sendPanTiltAbsolute(
 					job.target,
-					panLonger ? speed : speedForVelocity(PanVelocity, velocity * ratio),
-					panLonger ? speedForVelocity(TiltVelocity, velocity * ratio) : speed);
+					panLonger ? speed : speedForVelocity(m_panVelocity, velocity * ratio),
+					panLonger ? speedForVelocity(m_tiltVelocity, velocity * ratio) : speed);
 			}
 			break;
 		case PtzStep::Focus:
@@ -658,8 +726,8 @@ void CameraClient::sendPanTiltAbsolute(PtzPosition const &pos, int const panSpee
 	// VISCA Pan-tilt Absolute: 81 01 06 02 VV WW 0Y 0Y 0Y 0Y [0Y] 0Z 0Z 0Z 0Z FF
 	std::array<uint8_t, 16> cmd{
 		0x81, 0x01, 0x06, 0x02,
-		static_cast<uint8_t>(std::clamp(panSpeed, 1, MaxPanSpeed)),
-		static_cast<uint8_t>(std::clamp(tiltSpeed, 1, MaxTiltSpeed)),
+		static_cast<uint8_t>(std::clamp(panSpeed, 1, m_maxPanSpeed)),
+		static_cast<uint8_t>(std::clamp(tiltSpeed, 1, m_maxTiltSpeed)),
 	};
 	auto i = writeNibbles(cmd, 6, pos.pan, m_panNibbles);
 	i = writeNibbles(cmd, i, pos.tilt, 4);
@@ -679,11 +747,309 @@ void CameraClient::sendZoomDirect(int const zoom) {
 	if (m_ptzJob) {
 		m_ptzJob->zoomDirectSent = val;
 	}
+	sendZoomDirectValue(val);
+}
+
+void CameraClient::sendZoomDirectValue(int const val) {
 	// VISCA Zoom Direct: 81 01 04 47 0p 0q 0r 0s FF
 	std::array<uint8_t, 9> cmd{0x81, 0x01, 0x04, 0x47};
-	auto i = writeNibbles(cmd, 4, val, 4);
+	auto i = writeNibbles(cmd, 4, std::clamp(val, 0, 0xFFFF), 4);
 	cmd[i] = 0xFF;
 	sendVisca(cmd);
+}
+
+void CameraClient::sendPanTiltDrive(bool const tilt, int const speed, bool const reverse) {
+	// VISCA Pan-tilt Drive: 81 01 06 01 VV WW 0p 0q FF
+	// p: 1 left, 2 right, 3 stop; q: 1 up, 2 down, 3 stop
+	auto const dir = static_cast<uint8_t>(reverse ? 0x02 : 0x01);
+	auto const v = static_cast<uint8_t>(std::clamp(speed, 1, 0x7F));
+	std::array<uint8_t, 9> const cmd{
+		0x81, 0x01, 0x06, 0x01,
+		tilt ? uint8_t{1} : v,
+		tilt ? v : uint8_t{1},
+		tilt ? uint8_t{3} : dir,
+		tilt ? dir : uint8_t{3},
+		0xFF
+	};
+	sendVisca(cmd);
+}
+
+void CameraClient::sendPanTiltHome() {
+	// VISCA Pan-tilt Home: 81 01 06 04 FF
+	constexpr std::array<uint8_t, 5> cmd{0x81, 0x01, 0x06, 0x04, 0xFF};
+	sendVisca(cmd);
+}
+
+void CameraClient::sendMaxSpeedInquiry() {
+	// VISCA Pan-tilt MaxSpeed Inquiry: 81 09 06 11 FF
+	constexpr std::array<uint8_t, 5> inq{0x81, 0x09, 0x06, 0x11, 0xFF};
+	sendVisca(inq, true);
+}
+
+void CameraClient::calibrationTick() {
+	if (!m_calibration) {
+		m_calibrationTimer.stop();
+		return;
+	}
+	using Phase = CalibrationJob::Phase;
+	auto &cal = *m_calibration;
+	if (cal.replyTimer.elapsed() > CalibrationReplyTimeoutMs) {
+		finishCalibration(false, tr("Camera stopped responding."), false);
+		return;
+	}
+	if (cal.phaseTimer.elapsed() > CalibrationPhaseTimeoutMs) {
+		finishCalibration(false, tr("Camera did not finish moving."));
+		return;
+	}
+	switch (cal.phase) {
+		case Phase::Start:
+			if (m_panTiltGen != cal.seenPanTiltGen && m_zoomGen != cal.seenZoomGen) {
+				cal.start = m_ptzPos;
+				cal.haveStart = true;
+				enterCalibrationPhase(Phase::MaxSpeed);
+				return;
+			}
+			sendPanTiltInquiry();
+			sendZoomInquiry();
+			return;
+		case Phase::MaxSpeed:
+			if (m_maxSpeedGen != cal.seenMaxSpeedGen) {
+				// VISCA speeds are single bytes, anything else is a bad reply
+				if (m_maxSpeedReplyPan > 0 && m_maxSpeedReplyPan < 0x80 &&
+				    m_maxSpeedReplyTilt > 0 && m_maxSpeedReplyTilt < 0x80) {
+					cal.maxPanSpeed = m_maxSpeedReplyPan;
+					cal.maxTiltSpeed = m_maxSpeedReplyTilt;
+				}
+			} else if (cal.phaseTimer.elapsed() < CalibrationMaxSpeedTimeoutMs) {
+				return;
+			}
+			// otherwise unsupported, keep the standard VISCA maximums
+			enterCalibrationPhase(Phase::Home);
+			return;
+		case Phase::Home:
+			sendPanTiltInquiry();
+			if (calibrationSettled()) {
+				cal.home = m_ptzPos;
+				enterCalibrationPhase(Phase::Drive);
+			}
+			return;
+		case Phase::Drive:
+			sendPanTiltInquiry();
+			if (cal.phaseTimer.elapsed() >= cal.driveMs) {
+				enterCalibrationPhase(Phase::Stop);
+			}
+			return;
+		case Phase::Stop:
+			sendPanTiltInquiry();
+			if (calibrationSettled()) {
+				finishCalibrationMeasurement();
+			}
+			return;
+		case Phase::Return:
+			sendPanTiltInquiry();
+			if (calibrationSettled()) {
+				enterCalibrationPhase(cal.afterReturn);
+			}
+			return;
+		case Phase::Zoom:
+			sendZoomInquiry();
+			if (cal.phaseTimer.elapsed() >= ZoomDirectStartMs && calibrationSettled()) {
+				// a scale far off 1 more likely means the zoom was interrupted, keep the learned one
+				if (auto const scale = static_cast<double>(m_ptzPos.zoom) / CalibrationZoomVal;
+				    scale >= 0.5 && scale <= 2) {
+					m_zoomDirectScale = scale;
+					setZoomDirectScale(scale);
+				}
+				enterCalibrationPhase(Phase::Restore);
+			}
+			return;
+		case Phase::Restore:
+			sendPanTiltInquiry();
+			sendZoomInquiry();
+			if (calibrationSettled()) {
+				finishCalibration(true, {});
+			}
+			return;
+	}
+}
+
+void CameraClient::enterCalibrationPhase(CalibrationJob::Phase const phase) {
+	using Phase = CalibrationJob::Phase;
+	auto &cal = *m_calibration;
+	cal.phase = phase;
+	cal.phaseTimer.start();
+	cal.settleLast = m_ptzPos;
+	cal.settleTimer.start();
+	cal.seenPanTiltGen = m_panTiltGen;
+	cal.seenZoomGen = m_zoomGen;
+	switch (phase) {
+		case Phase::Start:
+			sendPanTiltInquiry();
+			sendZoomInquiry();
+			break;
+		case Phase::MaxSpeed:
+			cal.seenMaxSpeedGen = m_maxSpeedGen;
+			sendMaxSpeedInquiry();
+			break;
+		case Phase::Home:
+			sendPanTiltHome();
+			break;
+		case Phase::Drive:
+			cal.samples.clear();
+			// a retry is after hitting a limit, so stay closer to home
+			cal.driveMs = calibrationDriveMs(cal.tilt, cal.speed) / (cal.retried ? 2 : 1);
+			sendPanTiltDrive(cal.tilt, cal.speed, cal.reverse);
+			break;
+		case Phase::Stop:
+			sendPanTiltStop();
+			break;
+		case Phase::Return:
+			sendPanTiltAbsolute(cal.home, cal.maxPanSpeed, cal.maxTiltSpeed);
+			break;
+		case Phase::Zoom:
+			sendZoomDirectValue(CalibrationZoomVal);
+			break;
+		case Phase::Restore:
+			sendPanTiltAbsolute(cal.start, cal.maxPanSpeed, cal.maxTiltSpeed);
+			sendZoomDirect(cal.start.zoom);
+			break;
+	}
+	emitCalibrationProgress();
+}
+
+void CameraClient::finishCalibrationMeasurement() {
+	using Phase = CalibrationJob::Phase;
+	auto &cal = *m_calibration;
+	auto const velocity = calibrationVelocity();
+	if (!velocity) {
+		if (!cal.retried) {
+			cal.retried = true;
+			cal.afterReturn = Phase::Drive;
+			enterCalibrationPhase(Phase::Return);
+			return;
+		}
+		finishCalibration(false, tr("Could not measure %1 speed %2.")
+			.arg(cal.tilt ? tr("tilt") : tr("pan")).arg(cal.speed));
+		return;
+	}
+	(cal.tilt ? cal.tiltVelocity : cal.panVelocity).append(*velocity);
+	cal.retried = false;
+	cal.reverse = !cal.reverse;
+	++cal.speed;
+	if (cal.speed > (cal.tilt ? cal.maxTiltSpeed : cal.maxPanSpeed)) {
+		if (cal.tilt) {
+			cal.afterReturn = Phase::Zoom;
+		} else {
+			cal.tilt = true;
+			cal.speed = 1;
+			cal.reverse = false;
+			cal.afterReturn = Phase::Drive;
+		}
+		enterCalibrationPhase(Phase::Return);
+		return;
+	}
+	// alternating directions keeps the camera near home, but each move is longer than the last
+	auto const drifted = cal.tilt ?
+		std::abs(m_ptzPos.tilt - cal.home.tilt) > CalibrationTiltDrift :
+		std::abs(m_ptzPos.pan - cal.home.pan) > CalibrationPanDrift;
+	if (drifted) {
+		cal.afterReturn = Phase::Drive;
+		enterCalibrationPhase(Phase::Return);
+	} else {
+		enterCalibrationPhase(Phase::Drive);
+	}
+}
+
+void CameraClient::finishCalibration(bool const ok, QString const &error, bool const restore) {
+	auto cal = std::move(*m_calibration);
+	m_calibration.reset();
+	m_calibrationTimer.stop();
+	if (ok) {
+		makeNonDecreasing(cal.panVelocity);
+		makeNonDecreasing(cal.tiltVelocity);
+		setCameraCalibration({
+			.maxPanSpeed = cal.maxPanSpeed,
+			.maxTiltSpeed = cal.maxTiltSpeed,
+			.panVelocity = cal.panVelocity,
+			.tiltVelocity = cal.tiltVelocity,
+			.calibratedAt = QDateTime::currentDateTime(),
+		});
+		reloadCalibration();
+	} else {
+		sendPanTiltStop();
+		if (restore && cal.haveStart) {
+			sendPanTiltAbsolute(cal.start, m_maxPanSpeed, m_maxTiltSpeed);
+			sendZoomDirect(cal.start.zoom);
+		}
+	}
+	emit calibrationFinished(ok, error);
+}
+
+bool CameraClient::calibrationSettled() {
+	auto &cal = *m_calibration;
+	if (m_ptzPos != cal.settleLast) {
+		cal.settleLast = m_ptzPos;
+		cal.settleTimer.start();
+	}
+	return cal.settleTimer.elapsed() >= CalibrationSettleMs &&
+		cal.phaseTimer.elapsed() >= CalibrationMinSettleMs;
+}
+
+std::optional<double> CameraClient::calibrationVelocity() const {
+	auto const &samples = m_calibration->samples;
+	// ignore samples after the axis stopped changing, it hit a limit
+	qsizetype end = 0;
+	for (qsizetype i = 1; i < samples.size(); ++i) {
+		if (samples[i].second != samples[i - 1].second) {
+			end = i;
+		}
+	}
+	auto const count = end + 1;
+	if (count < CalibrationMinSamples || samples[end].first - samples[0].first < CalibrationMinSampleMs) {
+		return std::nullopt;
+	}
+	// middle half leaves out accelerating and decelerating
+	auto const &a = samples[count / 4];
+	auto const &b = samples[(3 * count) / 4];
+	if (b.first <= a.first) {
+		return std::nullopt;
+	}
+	auto const velocity = std::abs(b.second - a.second) * 1000.0 / static_cast<double>(b.first - a.first);
+	return velocity > 0 ? std::optional{velocity} : std::nullopt;
+}
+
+void CameraClient::emitCalibrationProgress() {
+	using Phase = CalibrationJob::Phase;
+	auto const &cal = *m_calibration;
+	auto const stepCount = cal.maxPanSpeed + cal.maxTiltSpeed + 3;
+	switch (cal.phase) {
+		case Phase::Start:
+		case Phase::MaxSpeed:
+		case Phase::Home:
+			emit calibrationProgress(0, stepCount, tr("Preparing..."));
+			break;
+		case Phase::Drive:
+		case Phase::Stop:
+		case Phase::Return:
+			if (cal.afterReturn == Phase::Zoom && cal.phase == Phase::Return) {
+				emit calibrationProgress(stepCount - 2, stepCount, tr("Measuring zoom..."));
+			} else if (cal.tilt) {
+				emit calibrationProgress(
+					1 + cal.maxPanSpeed + cal.speed - 1, stepCount,
+					tr("Measuring tilt speed %1 of %2...").arg(cal.speed).arg(cal.maxTiltSpeed));
+			} else {
+				emit calibrationProgress(
+					cal.speed, stepCount,
+					tr("Measuring pan speed %1 of %2...").arg(cal.speed).arg(cal.maxPanSpeed));
+			}
+			break;
+		case Phase::Zoom:
+			emit calibrationProgress(stepCount - 2, stepCount, tr("Measuring zoom..."));
+			break;
+		case Phase::Restore:
+			emit calibrationProgress(stepCount - 1, stepCount, tr("Returning to the starting position..."));
+			break;
+	}
 }
 
 void CameraClient::sendZoomVariable(bool const out, int const speed) {
@@ -789,6 +1155,13 @@ void CameraClient::handleViscaReply(std::span<uint8_t const> const reply, std::o
 		return;
 	}
 	auto const data = reply.subspan(2, reply.size() - 3);
+	if (data.size() == 2) {
+		// Pan-tilt MaxSpeed: whole bytes rather than nibbles, and the only 2 byte reply
+		m_maxSpeedReplyPan = data[0];
+		m_maxSpeedReplyTilt = data[1];
+		++m_maxSpeedGen;
+		return;
+	}
 	if (std::ranges::any_of(data, [](uint8_t const b) { return b > 0x0F; })) {
 		return;
 	}
@@ -803,6 +1176,12 @@ void CameraClient::handleViscaReply(std::span<uint8_t const> const reply, std::o
 			m_ptzPos.pan = signExtend(readNibbles(data.first(m_panNibbles)), panBits);
 			m_ptzPos.tilt = signExtend(readNibbles(data.subspan(m_panNibbles)), 16);
 			++m_panTiltGen;
+			if (m_calibration && m_calibration->phase == CalibrationJob::Phase::Drive) {
+				m_calibration->samples.append({
+					m_calibration->phaseTimer.elapsed(),
+					m_calibration->tilt ? m_ptzPos.tilt : m_ptzPos.pan,
+				});
+			}
 			break;
 		}
 		case 4: // zoom or focus
@@ -820,6 +1199,9 @@ void CameraClient::handleViscaReply(std::span<uint8_t const> const reply, std::o
 			break;
 		default:
 			return;
+	}
+	if (m_calibration) {
+		m_calibration->replyTimer.start();
 	}
 	checkPtzQuery();
 }

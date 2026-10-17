@@ -21,6 +21,7 @@
 #include <QString>
 #include <QTimer>
 #include <QUdpSocket>
+#include <QVector>
 
 constexpr size_t MaxMsgSz = 32;
 
@@ -61,6 +62,15 @@ class CameraClient: public QObject {
 		size_t m_panNibbles = 4;
 		// reported zoom position / Zoom Direct value, learned from the camera
 		double m_zoomDirectScale = 1.0;
+		// pan/tilt speed characteristics, from calibration or the defaults
+		int m_maxPanSpeed = 24;
+		int m_maxTiltSpeed = 20;
+		QVector<double> m_panVelocity;
+		QVector<double> m_tiltVelocity;
+		// last reply to the Pan-tilt MaxSpeed Inquiry
+		int m_maxSpeedReplyPan = 0;
+		int m_maxSpeedReplyTilt = 0;
+		uint64_t m_maxSpeedGen = 0;
 
 		enum class PtzStep {
 			Locate,
@@ -117,6 +127,51 @@ class CameraClient: public QObject {
 		std::optional<PtzQuery> m_ptzQuery;
 		int m_ptzQueryId = 0;
 
+		struct CalibrationJob {
+			enum class Phase {
+				// record the starting position, to return to at the end
+				Start,
+				MaxSpeed,
+				Home,
+				// measure the speed of one axis at one VISCA speed
+				Drive,
+				Stop,
+				// back to home before the next measurement
+				Return,
+				Zoom,
+				Restore,
+			};
+			Phase phase = Phase::Start;
+			// phase to enter once Return reaches home
+			Phase afterReturn = Phase::Drive;
+			QElapsedTimer phaseTimer;
+			// time since the last position reply, for detecting the camera going quiet
+			QElapsedTimer replyTimer;
+			uint64_t seenPanTiltGen = 0;
+			uint64_t seenZoomGen = 0;
+			uint64_t seenMaxSpeedGen = 0;
+			bool haveStart = false;
+			PtzPosition start;
+			PtzPosition home;
+			int maxPanSpeed = 24;
+			int maxTiltSpeed = 20;
+			// axis and speed being measured
+			bool tilt = false;
+			int speed = 1;
+			bool reverse = false;
+			bool retried = false;
+			qint64 driveMs = 0;
+			// position of the measured axis while driving, with time since the drive started
+			QVector<QPair<qint64, int>> samples;
+			QVector<double> panVelocity{0};
+			QVector<double> tiltVelocity{0};
+			// for detecting when the camera has stopped moving
+			PtzPosition settleLast;
+			QElapsedTimer settleTimer;
+		};
+		std::optional<CalibrationJob> m_calibration;
+		QTimer m_calibrationTimer;
+
 	public:
 		explicit CameraClient(QObject *parent = nullptr);
 
@@ -139,8 +194,21 @@ class CameraClient: public QObject {
 		 */
 		void queryPtzPosition();
 
+		/**
+		 * Measures the camera's pan/tilt speeds and zoom scale, moving the camera.
+		 * Emits calibrationProgress as it goes, and calibrationFinished at the end.
+		 */
+		void startCalibration();
+
+		/**
+		 * Stops calibration and returns the camera to where it started.
+		 */
+		void cancelCalibration();
+
 	public slots:
 		void reloadConnectionSettings();
+
+		void reloadCalibration();
 
 	private:
 		void setBrightness(int val);
@@ -234,7 +302,46 @@ class CameraClient: public QObject {
 
 		void sendPanTiltStop();
 
+		/**
+		 * @param zoom reported zoom position, converted to the camera's Zoom Direct scale
+		 */
 		void sendZoomDirect(int zoom);
+
+		void sendZoomDirectValue(int val);
+
+		void sendPanTiltDrive(bool tilt, int speed, bool reverse);
+
+		void sendPanTiltHome();
+
+		void sendMaxSpeedInquiry();
+
+		void calibrationTick();
+
+		void enterCalibrationPhase(CalibrationJob::Phase phase);
+
+		/**
+		 * Handles a speed measurement once the camera has stopped.
+		 */
+		void finishCalibrationMeasurement();
+
+		/**
+		 * @param restore return the camera to where calibration started, if it failed
+		 */
+		void finishCalibration(bool ok, QString const &error, bool restore = true);
+
+		/**
+		 * @return true if the camera appears to have stopped moving
+		 */
+		[[nodiscard]]
+		bool calibrationSettled();
+
+		/**
+		 * @return velocity in position units per second, or empty if there's too little movement
+		 */
+		[[nodiscard]]
+		std::optional<double> calibrationVelocity() const;
+
+		void emitCalibrationProgress();
 
 		void sendZoomVariable(bool out, int speed);
 
@@ -272,6 +379,10 @@ class CameraClient: public QObject {
 		void ptzPositionReceived(int pan, int tilt, int zoom, int focus);
 
 		void ptzPositionQueryFailed();
+
+		void calibrationProgress(int step, int stepCount, QString const &description);
+
+		void calibrationFinished(bool ok, QString const &error);
 
 };
 

@@ -14,6 +14,8 @@
 #include <QIntValidator>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMessageBox>
+#include <QProgressDialog>
 #include <QPushButton>
 #include <QSettings>
 #include <QSignalBlocker>
@@ -186,6 +188,22 @@ QWidget *SettingsDialog::setupCameraPresetConfig(QWidget *parent) {
 		QSignalBlocker const zBlocker(m_zoomSpeed);
 		m_panTiltSpeed->setValue(speed.panTilt);
 		m_zoomSpeed->setValue(speed.zoom);
+		// calibration is saved as soon as it finishes, independent of OK and Apply
+		auto const calRoot = new QWidget(grp);
+		auto const calLyt = new QHBoxLayout(calRoot);
+		calLyt->setContentsMargins(0, 0, 0, 0);
+		m_calibrationLbl = new QLabel(calRoot);
+		m_calibrateBtn = new QPushButton(tr("Ca&librate..."), calRoot);
+		m_resetCalibrationBtn = new QPushButton(tr("Reset"), calRoot);
+		m_resetCalibrationBtn->setToolTip(tr("Go back to the built-in speed measurements"));
+		calLyt->addWidget(m_calibrationLbl, 1);
+		calLyt->addWidget(m_calibrateBtn);
+		calLyt->addWidget(m_resetCalibrationBtn);
+		formLyt->addRow(tr("Calibration:"), calRoot);
+		connect(m_calibrateBtn, &QPushButton::clicked, this, &SettingsDialog::startCalibration);
+		connect(m_resetCalibrationBtn, &QPushButton::clicked, this, &SettingsDialog::resetCalibration);
+		updateCalibrationStatus();
+		updateCalibrateEnabled();
 	}
 	{
 		auto const btnRoot = new QWidget(root);
@@ -206,6 +224,94 @@ QWidget *SettingsDialog::setupCameraPresetConfig(QWidget *parent) {
 void SettingsDialog::setCameraConnected(bool const connected) {
 	m_cameraConnected = connected;
 	updateGetPtzEnabled();
+	updateCalibrateEnabled();
+}
+
+void SettingsDialog::setCalibrationProgress(int const step, int const stepCount, QString const &description) {
+	if (m_calibrationProgress) {
+		m_calibrationProgress->setMaximum(stepCount);
+		m_calibrationProgress->setValue(step);
+		m_calibrationProgress->setLabelText(description);
+	}
+}
+
+void SettingsDialog::calibrationFinished(bool const ok, QString const &error) {
+	m_calibrating = false;
+	if (m_calibrationProgress) {
+		// closing the progress dialog would otherwise emit canceled
+		m_calibrationProgress->disconnect(this);
+		m_calibrationProgress->deleteLater();
+		m_calibrationProgress = nullptr;
+	}
+	setError(ok ? QString{} : error);
+	updateCalibrationStatus();
+	updateCalibrateEnabled();
+}
+
+void SettingsDialog::startCalibration() {
+	auto const answer = QMessageBox::question(
+		this,
+		tr("Calibrate Camera"),
+		tr("The camera will move through its pan, tilt, and zoom range for a minute or two. "
+		   "Only do this while the camera is not live.\n\n"
+		   "It will return to its current position when finished."));
+	if (answer != QMessageBox::Yes) {
+		return;
+	}
+	m_calibrating = true;
+	updateCalibrateEnabled();
+	setError({});
+	m_calibrationProgress = new QProgressDialog(tr("Preparing..."), tr("Cancel"), 0, 1, this);
+	m_calibrationProgress->setWindowTitle(tr("Calibrating Camera"));
+	m_calibrationProgress->setWindowModality(Qt::WindowModal);
+	m_calibrationProgress->setMinimumDuration(0);
+	// the step count isn't known until calibration starts, so don't let reaching it close the dialog
+	m_calibrationProgress->setAutoClose(false);
+	m_calibrationProgress->setAutoReset(false);
+	connect(m_calibrationProgress, &QProgressDialog::canceled, this, &SettingsDialog::cancelCalibration);
+	m_calibrationProgress->show();
+	emit requestCalibration();
+}
+
+void SettingsDialog::resetCalibration() {
+	auto const answer = QMessageBox::question(
+		this,
+		tr("Reset Calibration"),
+		tr("Go back to the built-in speed measurements? These were measured on a different camera."));
+	if (answer != QMessageBox::Yes) {
+		return;
+	}
+	clearCameraCalibration();
+	updateCalibrationStatus();
+	emit calibrationReset();
+}
+
+void SettingsDialog::updateCalibrationStatus() {
+	if (!m_calibrationLbl) {
+		return;
+	}
+	auto const cal = getCameraCalibration();
+	if (cal.calibratedAt.isValid()) {
+		m_calibrationLbl->setText(tr("Calibrated %1").arg(
+			QLocale().toString(cal.calibratedAt.date(), QLocale::ShortFormat)));
+		m_calibrationLbl->setToolTip(tr("Speeds measured on %1, max pan speed %2, max tilt speed %3").arg(
+			QLocale().toString(cal.calibratedAt, QLocale::ShortFormat)).arg(cal.maxPanSpeed).arg(cal.maxTiltSpeed));
+	} else {
+		m_calibrationLbl->setText(tr("Not calibrated"));
+		m_calibrationLbl->setToolTip(tr("Using built-in speed measurements from a different camera"));
+	}
+	if (m_resetCalibrationBtn) {
+		m_resetCalibrationBtn->setEnabled(cal.calibratedAt.isValid());
+	}
+}
+
+void SettingsDialog::updateCalibrateEnabled() {
+	if (m_calibrateBtn) {
+		m_calibrateBtn->setEnabled(m_cameraConnected && !m_calibrating);
+		m_calibrateBtn->setToolTip(m_cameraConnected ?
+			tr("Measure the camera's pan and tilt speeds, so pan and tilt finish moving together") :
+			tr("Functionality is unavailable when camera is not connected"));
+	}
 }
 
 void SettingsDialog::setPtzPosition(int const pan, int const tilt, int const zoom, int const focus) {

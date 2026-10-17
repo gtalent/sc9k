@@ -43,6 +43,11 @@ class SettingsDialog: public QDialog {
 		bool m_ptzQueryPending = false;
 		class QSpinBox *m_panTiltSpeed = nullptr;
 		class QSpinBox *m_zoomSpeed = nullptr;
+		class QLabel *m_calibrationLbl = nullptr;
+		class QPushButton *m_calibrateBtn = nullptr;
+		class QPushButton *m_resetCalibrationBtn = nullptr;
+		class QProgressDialog *m_calibrationProgress = nullptr;
+		bool m_calibrating = false;
 		int m_vidCurrentPreset = 0;
 		class QTableWidget *m_viewTable = nullptr;
 	public:
@@ -56,6 +61,10 @@ class SettingsDialog: public QDialog {
 		void setPtzPosition(int pan, int tilt, int zoom, int focus);
 
 		void ptzPositionQueryFailed();
+
+		void setCalibrationProgress(int step, int stepCount, QString const &description);
+
+		void calibrationFinished(bool ok, QString const &error);
 	private:
 		QWidget *setupNetworkInputs(QWidget *parent);
 		QWidget *setupViewConfig(QWidget *parent);
@@ -81,10 +90,23 @@ class SettingsDialog: public QDialog {
 		void updateCameraPresetCollect(int preset);
 		void updatePtzEnabled();
 		void updateGetPtzEnabled();
+		void updateCalibrationStatus();
+		void updateCalibrateEnabled();
+		void startCalibration();
+		void resetCalibration();
 	signals:
 		void previewPreset(int, CameraPreset const&);
 
 		void requestPtzPosition();
+
+		void requestCalibration();
+
+		void cancelCalibration();
+
+		/**
+		 * The saved calibration was cleared.
+		 */
+		void calibrationReset();
 
 		void settingsApplied();
 };

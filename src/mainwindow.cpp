@@ -257,6 +257,11 @@ void MainWindow::openSettings() {
 	connect(&d, &SettingsDialog::requestPtzPosition, &m_cameraClient, &CameraClient::queryPtzPosition);
 	connect(&m_cameraClient, &CameraClient::ptzPositionReceived, &d, &SettingsDialog::setPtzPosition);
 	connect(&m_cameraClient, &CameraClient::ptzPositionQueryFailed, &d, &SettingsDialog::ptzPositionQueryFailed);
+	connect(&d, &SettingsDialog::requestCalibration, &m_cameraClient, &CameraClient::startCalibration);
+	connect(&d, &SettingsDialog::cancelCalibration, &m_cameraClient, &CameraClient::cancelCalibration);
+	connect(&d, &SettingsDialog::calibrationReset, &m_cameraClient, &CameraClient::reloadCalibration);
+	connect(&m_cameraClient, &CameraClient::calibrationProgress, &d, &SettingsDialog::setCalibrationProgress);
+	connect(&m_cameraClient, &CameraClient::calibrationFinished, &d, &SettingsDialog::calibrationFinished);
 	d.setCameraConnected(m_cameraClient.connected());
 	connect(&m_cameraClient, &CameraClient::pollUpdate, &d, [&d] { d.setCameraConnected(true); });
 	connect(&m_cameraClient, &CameraClient::pollFailed, &d, [&d] { d.setCameraConnected(false); });

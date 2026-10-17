@@ -101,6 +101,63 @@ double getZoomDirectScale() {
 	return s.value("Camera/ZoomDirectScale", 1.0).toDouble();
 }
 
+[[nodiscard]]
+static QStringList toStringList(QVector<double> const &vals) {
+	QStringList out;
+	for (auto const v : vals) {
+		out.append(QString::number(v));
+	}
+	return out;
+}
+
+[[nodiscard]]
+static QVector<double> toDoubles(QStringList const &vals) {
+	QVector<double> out;
+	for (auto const &v : vals) {
+		out.append(v.toDouble());
+	}
+	return out;
+}
+
+void setCameraCalibration(CameraCalibration const &cal) {
+	QSettings s;
+	s.beginGroup("Camera");
+	s.setValue("MaxPanSpeed", cal.maxPanSpeed);
+	s.setValue("MaxTiltSpeed", cal.maxTiltSpeed);
+	s.setValue("PanVelocity", toStringList(cal.panVelocity));
+	s.setValue("TiltVelocity", toStringList(cal.tiltVelocity));
+	s.setValue("CalibratedAt", cal.calibratedAt);
+	s.endGroup();
+}
+
+CameraCalibration getCameraCalibration() {
+	QSettings s;
+	s.beginGroup("Camera");
+	CameraCalibration const cal{
+		.maxPanSpeed = s.value("MaxPanSpeed").toInt(),
+		.maxTiltSpeed = s.value("MaxTiltSpeed").toInt(),
+		.panVelocity = toDoubles(s.value("PanVelocity").toStringList()),
+		.tiltVelocity = toDoubles(s.value("TiltVelocity").toStringList()),
+		.calibratedAt = s.value("CalibratedAt").toDateTime(),
+	};
+	s.endGroup();
+	// tables are indexed by speed, so they must cover every speed up to the max
+	auto const valid =
+		cal.calibratedAt.isValid() &&
+		cal.maxPanSpeed > 0 && cal.panVelocity.size() == cal.maxPanSpeed + 1 &&
+		cal.maxTiltSpeed > 0 && cal.tiltVelocity.size() == cal.maxTiltSpeed + 1;
+	return valid ? cal : CameraCalibration{};
+}
+
+void clearCameraCalibration() {
+	QSettings s;
+	s.beginGroup("Camera");
+	for (auto const key : {"MaxPanSpeed", "MaxTiltSpeed", "PanVelocity", "TiltVelocity", "CalibratedAt"}) {
+		s.remove(key);
+	}
+	s.endGroup();
+}
+
 void setCameraConnectionData(QSettings &settings, ConnectionData const &cd) {
 	settings.beginGroup("CameraClient");
 	settings.setValue("Host", cd.host);

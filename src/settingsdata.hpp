@@ -9,6 +9,7 @@
 #pragma once
 
 #include <cstdint>
+#include <QDateTime>
 #include <QString>
 #include <QVector>
 
@@ -59,6 +60,36 @@ void setZoomDirectScale(double scale);
 
 [[nodiscard]]
 double getZoomDirectScale();
+
+/**
+ * Pan/tilt speed characteristics of the camera, measured by calibration.
+ * Defaults are measurements of the camera this was developed with.
+ */
+struct CameraCalibration {
+	int maxPanSpeed = 24;
+	int maxTiltSpeed = 20;
+	// position units per second at each VISCA speed, index 0 unused
+	QVector<double> panVelocity{
+		0, 25, 31, 44, 60, 85, 110, 145, 180, 224, 268, 322, 376,
+		450, 523, 554, 584, 631, 677, 718, 759, 804, 848, 857, 866,
+	};
+	QVector<double> tiltVelocity{
+		0, 24, 31, 43, 60, 83, 112, 144, 177, 219, 260, 305, 350,
+		355, 360, 365, 370, 372, 375, 375, 375,
+	};
+	// invalid if not calibrated
+	QDateTime calibratedAt;
+};
+
+void setCameraCalibration(CameraCalibration const &cal);
+
+/**
+ * @return the saved calibration, or the defaults if there is none or it is invalid
+ */
+[[nodiscard]]
+CameraCalibration getCameraCalibration();
+
+void clearCameraCalibration();
 
 struct ConnectionData {
 	QString host;
