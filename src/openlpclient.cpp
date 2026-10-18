@@ -42,7 +42,7 @@ OpenLPClient::OpenLPClient(QObject *parent): QObject(parent) {
 }
 
 QString OpenLPClient::getNextSong() {
-	auto const songIdx = m_songList.indexOf(m_currentSongTitle) + 1;
+	auto const songIdx = m_songIdList.indexOf(m_currentSongId) + 1;
 	if (songIdx > 0 && songIdx < m_songList.size()) {
 		return m_songList[songIdx];
 	}
@@ -125,20 +125,14 @@ void OpenLPClient::requestSongList() {
 			qDebug() << "OpenLPClient error response:" << reply->errorString();
 			return;
 		}
-		QHash<QString, QString> songNameMap;
 		QStringList songList;
 		QStringList songIdList;
 		for (auto const &item : QJsonDocument::fromJson(reply->readAll()).array()) {
 			auto const song = item.toObject();
-			auto const id = song["id"].toString();
-			auto const title = song["title"].toString();
-			songNameMap[id] = title;
-			songList.push_back(title);
-			songIdList.push_back(id);
+			songList.push_back(song["title"].toString());
+			songIdList.push_back(song["id"].toString());
 		}
-		m_songNameMap = std::move(songNameMap);
 		m_songIdList = std::move(songIdList);
-		m_currentSongTitle = m_songNameMap.value(m_currentSongId, m_currentSongTitle);
 		if (m_songList != songList) {
 			m_songList = std::move(songList);
 			emit songListUpdate(m_songList);
@@ -172,9 +166,6 @@ void OpenLPClient::requestSlideList() {
 			slideList.push_back(std::move(text));
 			tagList.push_back(slide["tag"].toVariant().toString());
 		}
-		if (!m_songNameMap.contains(m_currentSongId)) {
-			m_currentSongTitle = item["title"].toString();
-		}
 		if (m_currentSlideList != slideList || m_currentTagList != tagList) {
 			m_currentSlideList = std::move(slideList);
 			m_currentTagList = std::move(tagList);
@@ -187,17 +178,16 @@ void OpenLPClient::requestSlideList() {
 void OpenLPClient::resetState() {
 	m_currentServiceId = -1;
 	m_currentSongId = "";
-	m_currentSongTitle = "";
 	m_currentSlide = 0;
 	m_currentSlideList.clear();
 	m_currentTagList.clear();
-	m_songNameMap.clear();
 	m_songList.clear();
 	m_songIdList.clear();
 }
 
 void OpenLPClient::emitUpdate() {
-	emit pollUpdate(m_currentSongTitle, m_currentSlide);
+	// identify the song by position, as titles are not unique
+	emit pollUpdate(static_cast<int>(m_songIdList.indexOf(m_currentSongId)), m_currentSlide);
 }
 
 void OpenLPClient::connectToOpenLP() {
@@ -260,7 +250,6 @@ void OpenLPClient::onWsMessage(QByteArray const &message) {
 	}
 	if (itemChanged) {
 		m_currentSongId = songId;
-		m_currentSongTitle = m_songNameMap.value(songId);
 		emit songChanged(songId);
 	}
 	if (serviceChanged || itemChanged) {

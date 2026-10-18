@@ -8,7 +8,6 @@
 
 #pragma once
 
-#include <QHash>
 #include <QNetworkAccessManager>
 #include <QObject>
 #include <QString>
@@ -34,8 +33,6 @@ class OpenLPClient: public QObject {
 		bool m_connected = false;
 		bool m_pongReceived = false;
 
-		// service item ID -> title
-		QHash<QString, QString> m_songNameMap;
 		QStringList m_songList;
 		// service item IDs, in the same order as m_songList
 		QStringList m_songIdList;
@@ -43,7 +40,6 @@ class OpenLPClient: public QObject {
 		QStringList m_currentTagList;
 		int m_currentServiceId = -1;
 		QString m_currentSongId;
-		QString m_currentSongTitle;
 		int m_currentSlide = 0;
 
 	public:
@@ -94,7 +90,7 @@ class OpenLPClient: public QObject {
 		void onWsMessage(QByteArray const &message);
 
 	signals:
-		void pollUpdate(QString songId, int slideNum);
+		void pollUpdate(int songIdx, int slideNum);
 
 		void pollFailed();
 

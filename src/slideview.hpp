@@ -14,7 +14,7 @@ class SlideView: public QWidget {
 	private:
 		class QTableWidget *m_slideTable = nullptr;
 		class QListWidget *m_songSelector = nullptr;
-		QString m_currentSong;
+		int m_currentSong = -1;
 		int m_currentSlide = -1;
 
 	public:
@@ -24,7 +24,7 @@ class SlideView: public QWidget {
 		QString getNextSong() const;
 
 	public slots:
-		void pollUpdate(const QString& songId, int slideNum);
+		void pollUpdate(int songIdx, int slideNum);
 
 		void songListUpdate(QStringList const&songList);
 

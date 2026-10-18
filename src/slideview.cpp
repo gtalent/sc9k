@@ -42,15 +42,13 @@ QString SlideView::getNextSong() const {
 	return "";
 }
 
-void SlideView::pollUpdate(QString const &songId, int const slideNum) {
-	auto const songItems = m_songSelector->findItems(songId, Qt::MatchFixedString);
-	if (songItems.empty()) {
+void SlideView::pollUpdate(int const songIdx, int const slideNum) {
+	if (songIdx < 0 || songIdx >= m_songSelector->count()) {
 		return;
 	}
-	auto songItem = songItems.first();
-	if (songItem != m_songSelector->currentItem()) {
-		m_currentSong = songId;
-		m_songSelector->setCurrentItem(songItem);
+	if (songIdx != m_songSelector->currentRow()) {
+		m_currentSong = songIdx;
+		m_songSelector->setCurrentRow(songIdx);
 	}
 	if (slideNum != m_currentSlide) {
 		m_currentSlide = slideNum;
@@ -59,11 +57,10 @@ void SlideView::pollUpdate(QString const &songId, int const slideNum) {
 }
 
 void SlideView::changeSong(int const song) {
-	if (song < 0) {
+	if (song < 0 || song >= m_songSelector->count()) {
 		return;
 	}
-	auto const songItem = m_songSelector->item(song);
-	if (songItem && songItem->text() != m_currentSong) {
+	if (song != m_currentSong) {
 		emit songChanged(song);
 	}
 }
@@ -87,7 +84,7 @@ void SlideView::slideListUpdate(QStringList tagList, QStringList const &slideLis
 void SlideView::reset() {
 	m_songSelector->clear();
 	m_slideTable->setRowCount(0);
-	m_currentSong = "";
+	m_currentSong = -1;
 	m_currentSlide = -1;
 }
 
