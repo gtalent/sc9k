@@ -193,7 +193,7 @@ QWidget *SettingsDialog::setupCameraPresetConfig(QWidget *parent) {
 		auto const calLyt = new QHBoxLayout(calRoot);
 		calLyt->setContentsMargins(0, 0, 0, 0);
 		m_calibrationLbl = new QLabel(calRoot);
-		m_calibrateBtn = new QPushButton(tr("Ca&librate..."), calRoot);
+		m_calibrateBtn = new QPushButton(tr("Calibrate&..."), calRoot);
 		m_resetCalibrationBtn = new QPushButton(tr("Reset"), calRoot);
 		m_resetCalibrationBtn->setToolTip(tr("Go back to the built-in speed measurements"));
 		calLyt->addWidget(m_calibrationLbl, 1);
