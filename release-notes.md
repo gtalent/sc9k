@@ -10,6 +10,7 @@
 * Change camera client to use VISCA
 * Add Qt install to Linux install script
 * Add uninstall script
+* Fix issue with duplicate song names always showing the first one selected
 * Fix settings saved with Apply not taking effect until restart if the settings dialog was then closed with Cancel
 * Fix icon on Wayland
 
