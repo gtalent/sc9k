@@ -11,6 +11,7 @@
 # "Python Busy Box" - adds cross-platform equivalents to Unix commands that
 #                     don't translate well to that other operating system
 
+import multiprocessing
 import os
 import platform
 import shutil
@@ -57,7 +58,11 @@ def cmake_build(base_path: str, target: Optional[str]) -> int:
         path = os.path.join(base_path, d)
         if not os.path.isdir(path):
             continue
-        args = ['cmake', '--build', path]
+        args = ['cmake', '--build', path, f'-j{multiprocessing.cpu_count()}']
+        if path.endswith('release'):
+            args.append('--config=release')
+        elif path.endswith('debug'):
+            args.append('--config=debug')
         if target is not None:
             args.extend(['--target', target])
         err = subprocess.run(args).returncode

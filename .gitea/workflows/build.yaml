@@ -1,0 +1,34 @@
+name: Build
+run-name: ${{ gitea.actor }} build and test
+on: [push]
+
+jobs:
+  build-linux:
+    runs-on: olympic-linux-x86_64
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v3
+      - run: make devenv-destroy
+      - run: make devenv-image
+      - run: make devenv-create
+      - run: make purge configure-debug
+      - run: make build
+      - run: make test
+      - run: make purge configure-asan
+      - run: make build
+      - run: make test
+      - run: make purge configure-release
+      - run: make build
+      - run: make test
+      - run: make install
+      - if: always()
+        run: make devenv-destroy
+      - run: mv dist/linux-x86_64-release SC9K-linux-x86_64
+      - run: tar czf SC9K-linux-x86_64.tar.gz SC9K-linux-x86_64
+      - name: Upload Artifact
+        uses: https://gitea.com/actions/gitea-upload-artifact@v7
+        with:
+          name: 'SC9K-linux-x86_64.tar.gz'
+          path: SC9K-linux-x86_64.tar.gz
+          archive: false
+          if-no-files-found: error

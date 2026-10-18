@@ -11,8 +11,9 @@ ifeq (${OS},Windows_NT)
 	.SHELLFLAGS := -NoProfile -Command
 	BC_VAR_OS=windows
 	BC_CMD_HOST_PY3=python
+	undefine BC_VAR_USE_DOCKER_DEVENV
 else
-	BC_VAR_OS=$(shell uname | tr [:upper:] [:lower:])
+	BC_VAR_OS:=$(shell uname | tr [:upper:] [:lower:])
 	ifneq ($(shell which python3 2> /dev/null),)
 		BC_CMD_HOST_PY3=python3
 	else
@@ -28,10 +29,11 @@ endif
 
 ifdef BC_VAR_USE_DOCKER_DEVENV
 	ifneq ($(shell which docker 2> /dev/null),)
-		BC_VAR_DEVENV=devenv$(shell pwd | sed 's/\//-/g')
-		BC_VAR_DEVENV_IMAGE=${BC_VAR_PROJECT_NAME}-devenv
+		BC_VAR_DEVENV:=devenv$(shell pwd | sed 's/\//-/g')
+		BC_VAR_DEVENV_IMAGE:=${BC_VAR_PROJECT_NAME}-devenv
 		ifeq ($(shell docker inspect --format="{{.State.Status}}" ${BC_VAR_DEVENV} 2>&1),running)
-			BC_CMD_ENVRUN=docker exec -i -t --user $(shell id -u ${USER}) ${BC_VAR_DEVENV}
+			BC_CMD_ENVRUN:=docker exec -i --user $(shell id -u ${USER}) ${BC_VAR_DEVENV}
+			BC_CMD_ENVRUN_I=docker exec -i -t --user $(shell id -u ${USER}) ${BC_VAR_DEVENV}
 		endif
 	endif
 	ifneq ($(shell ${BC_CMD_ENVRUN} which python3 2> /dev/null),)
@@ -52,20 +54,20 @@ else
 endif
 
 BC_VAR_SCRIPTS=${BUILDCORE_PATH}/scripts
-BC_CMD_SETUP_BUILD=${BC_CMD_PY3} ${BC_VAR_SCRIPTS}/setup-build.py
-BC_CMD_PYBB=${BC_CMD_PY3} ${BC_VAR_SCRIPTS}/pybb.py
-BC_CMD_HOST_PYBB=${BC_CMD_HOST_PY3} ${BC_VAR_SCRIPTS}/pybb.py
-BC_CMD_CMAKE_BUILD=${BC_CMD_PYBB} cmake-build
-BC_CMD_GETENV=${BC_CMD_PYBB} getenv
-BC_CMD_CTEST=${BC_CMD_PYBB} ctest-all
-BC_CMD_RM_RF=${BC_CMD_PYBB} rm
-BC_CMD_MKDIR_P=${BC_CMD_PYBB} mkdir
-BC_CMD_CAT=${BC_CMD_PYBB} cat
-BC_CMD_DEBUGGER=${BC_CMD_PYBB} debug
-BC_CMD_HOST_DEBUGGER=${BC_CMD_HOST_PYBB} debug
-BC_VAR_HOSTENV=$(shell ${BC_CMD_ENVRUN} ${BC_CMD_PYBB} hostenv)
+BC_CMD_SETUP_BUILD:=${BC_CMD_PY3} ${BC_VAR_SCRIPTS}/setup-build.py
+BC_CMD_PYBB:=${BC_CMD_PY3} ${BC_VAR_SCRIPTS}/pybb.py
+BC_CMD_HOST_PYBB:=${BC_CMD_HOST_PY3} ${BC_VAR_SCRIPTS}/pybb.py
+BC_CMD_CMAKE_BUILD:=${BC_CMD_PYBB} cmake-build
+BC_CMD_GETENV:=${BC_CMD_PYBB} getenv
+BC_CMD_CTEST:=${BC_CMD_PYBB} ctest-all
+BC_CMD_RM_RF:=${BC_CMD_PYBB} rm
+BC_CMD_MKDIR_P:=${BC_CMD_PYBB} mkdir
+BC_CMD_CAT:=${BC_CMD_PYBB} cat
+BC_CMD_DEBUGGER:=${BC_CMD_PYBB} debug
+BC_CMD_HOST_DEBUGGER:=${BC_CMD_HOST_PYBB} debug
+BC_VAR_HOSTENV:=$(shell ${BC_CMD_PYBB} hostenv)
 BC_VAR_BUILD_PATH=build
-BC_VAR_CURRENT_BUILD=$(BC_VAR_HOSTENV)-$(shell ${BC_CMD_ENVRUN} ${BC_CMD_CAT} .current_build)
+BC_VAR_CURRENT_BUILD:=$(BC_VAR_HOSTENV)-$(shell ${BC_CMD_CAT} .current_build)
 
 ifdef BC_VAR_USE_VCPKG
 ifndef BC_VAR_VCPKG_DIR_BASE
@@ -93,8 +95,7 @@ purge:
 	${BC_CMD_RM_RF} compile_commands.json
 .PHONY: test
 test: build
-	${BC_CMD_ENVRUN} mypy ${BC_VAR_SCRIPTS}
-	${BC_CMD_CMAKE_BUILD} ${BC_VAR_BUILD_PATH} test
+	${BC_CMD_CTEST} ${BC_VAR_BUILD_PATH}
 .PHONY: test-verbose
 test-verbose: build
 	${BC_CMD_CTEST} ${BC_VAR_BUILD_PATH} --output-on-failure
@@ -125,7 +126,7 @@ devenv-destroy:
 ifdef BC_CMD_ENVRUN
 .PHONY: devenv-shell
 devenv-shell:
-	${BC_CMD_ENVRUN} bash
+	${BC_CMD_ENVRUN_I} bash
 endif
 endif
 

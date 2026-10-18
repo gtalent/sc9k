@@ -35,4 +35,6 @@ def get_arch() -> str:
     arch = platform.machine().lower()
     if arch == 'amd64':
         arch = 'x86_64'
+    elif arch == 'aarch64':
+        arch = 'arm64'
     return arch
